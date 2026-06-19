@@ -4,11 +4,13 @@ import {
   Activity as LiveIcon, 
   BookOpen as PracticeIcon, 
   BarChart2 as AnalyticsIcon, 
+  User as UserIcon,
   Wifi, 
   Battery, 
   Signal, 
-  ShieldCheck,
-  Lock
+  ShieldCheck, 
+  Lock,
+  LogOut
 } from 'lucide-react';
 import { DoctorProfile, Exam, Question, UserProgress, SubjectCategory } from '../types';
 import HomeTab from './HomeTab';
@@ -16,6 +18,7 @@ import LiveExamsTab from './LiveExamsTab';
 import PracticeTab from './PracticeTab';
 import AnalyticsTab from './AnalyticsTab';
 import AuthScreen from './AuthScreen';
+import ProfileTab from './ProfileTab';
 
 interface WeakChapter {
   chapter: string;
@@ -37,9 +40,15 @@ interface PhoneSimulatorProps {
   onChangeTabInSimulator?: (tabId: string) => void;
   onUpdateQuestions?: (qs: Question[]) => void;
 
+  // Mistakes and custom builder
+  mistakenQuestions: Question[];
+  onLaunchCustomTest: (subject: SubjectCategory, topic: string, questionCount: number, sbaOnly: boolean, includeMixed: boolean) => void;
+  onSetStartExamTrigger: (examId: string) => void;
+
   // Authentication State
   isAuthenticated: boolean;
-  onAuthSuccess: (doctorData: { name: string; email: string; bmdcNumber: string }) => void;
+  onAuthSuccess: (doctorData: { name: string; email: string; bmdcNumber: string; mobile: string; state?: any }) => void;
+  onLogout?: () => void;
 
   // Adaptive Remediation
   weakChapters: WeakChapter[];
@@ -52,6 +61,7 @@ interface PhoneSimulatorProps {
   onSelectReminderTime: (time: string) => void;
 
   questionsSolvedToday: number;
+  onUpdateProfile: (newProfile: DoctorProfile) => void;
 }
 
 export default function PhoneSimulator({
@@ -66,8 +76,15 @@ export default function PhoneSimulator({
   onChangeTabInSimulator,
   onUpdateQuestions,
 
+  // Mistakes and custom builder params
+  mistakenQuestions,
+  onLaunchCustomTest,
+  onSetStartExamTrigger,
+
   isAuthenticated,
   onAuthSuccess,
+  onLogout,
+  onUpdateProfile,
 
   weakChapters,
   onDrillChapter,
@@ -79,7 +96,7 @@ export default function PhoneSimulator({
   questionsSolvedToday
 }: PhoneSimulatorProps) {
   const [platform, setPlatform] = useState<'iOS' | 'Android'>('iOS');
-  const [activeTab, setActiveTab] = useState<'Home' | 'Live' | 'Practice' | 'Analytics'>('Home');
+  const [activeTab, setActiveTab] = useState<'Home' | 'Live' | 'Practice' | 'Analytics' | 'Profile'>('Home');
   const [batteryLevel] = useState<number>(98);
 
   // Sync clock time (simulate actual device status clock)
@@ -99,9 +116,13 @@ export default function PhoneSimulator({
     return () => clearInterval(interval);
   }, []);
 
-  const handleHomeExamShortcut = () => {
+  const handleHomeExamShortcut = (examId?: string) => {
     setActiveTab('Live');
-    if (onChangeTabInSimulator) onChangeTabInSimulator('Live');
+    if (examId) {
+      onSetStartExamTrigger(examId);
+    } else {
+      if (onChangeTabInSimulator) onChangeTabInSimulator('Live');
+    }
   };
 
   const handleDrillChapterRouting = (category: SubjectCategory) => {
@@ -127,6 +148,7 @@ export default function PhoneSimulator({
               if (tabId === 'Live') setActiveTab('Live');
               else if (tabId === 'Practice') setActiveTab('Practice');
               else if (tabId === 'Analytics') setActiveTab('Analytics');
+              else if (tabId === 'Profile') setActiveTab('Profile');
             }}
             onStartExam={handleHomeExamShortcut}
             weakChapters={weakChapters}
@@ -136,6 +158,9 @@ export default function PhoneSimulator({
             reminderTime={reminderTime}
             onSelectReminderTime={onSelectReminderTime}
             questionsSolvedToday={questionsSolvedToday}
+            mistakenQuestions={mistakenQuestions}
+            onLaunchCustomTest={onLaunchCustomTest}
+            progress={progress}
           />
         );
       case 'Live':
@@ -160,6 +185,14 @@ export default function PhoneSimulator({
           <AnalyticsTab 
             progress={progress} 
             doctorName={doctor.name}
+          />
+        );
+      case 'Profile':
+        return (
+          <ProfileTab 
+            doctor={doctor} 
+            onUpdateProfile={onUpdateProfile} 
+            onLogout={onLogout}
           />
         );
       default:
@@ -260,6 +293,15 @@ export default function PhoneSimulator({
                 <>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                   <span className="text-[9px] font-mono text-slate-300 font-bold tracking-tight">CBT CLOUD</span>
+                  {onLogout && (
+                    <button 
+                      onClick={onLogout}
+                      className="ml-1.5 p-1 bg-slate-800 hover:bg-slate-700 active:scale-90 rounded-md transition text-slate-300 hover:text-red-400 cursor-pointer flex items-center justify-center"
+                      title="Log Out Companion"
+                    >
+                      <LogOut className="w-3 h-3" />
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -316,6 +358,17 @@ export default function PhoneSimulator({
               >
                 <AnalyticsIcon className="w-4.5 h-4.5" />
                 <span className="text-[9px] tracking-tight">Analytics</span>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('Profile')}
+                className={`flex flex-col items-center justify-center space-y-1 transition-all flex-1 ${
+                  activeTab === 'Profile' ? 'text-teal-600 scale-105 font-bold' : 'text-slate-400 hover:text-slate-600'
+                }`}
+                id="tab-btn-profile"
+              >
+                <UserIcon className="w-4.5 h-4.5" />
+                <span className="text-[9px] tracking-tight">Profile</span>
               </button>
             </div>
           )}

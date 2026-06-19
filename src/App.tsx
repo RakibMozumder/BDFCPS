@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Heart, 
   Award, 
@@ -17,12 +17,14 @@ import {
   ChevronRight,
   LogOut,
   Stethoscope,
-  XCircle
+  XCircle,
+  Database
 } from 'lucide-react';
 import { DoctorProfile, Exam, Question, UserProgress, SubjectCategory } from './types';
 import { QUESTIONS_BANK, LIVE_EXAMS_DATA } from './data/questions';
 import PhoneSimulator from './components/PhoneSimulator';
 import CodeExportPanel from './components/CodeExportPanel';
+import DatabaseManagement, { getGoogleSheetsCsvUrl } from './components/DatabaseManagement';
 
 interface WeakChapter {
   chapter: string;
@@ -42,6 +44,7 @@ export default function App() {
     name: string;
     email: string;
     bmdcNumber: string;
+    mobile: string;
   } | null>(() => {
     const cached = localStorage.getItem('fcps_auth_user');
     return cached ? JSON.parse(cached) : null;
@@ -84,6 +87,15 @@ export default function App() {
   // Track MCQs solved today for Daily Study Goal visualization
   const [questionsSolvedToday, setQuestionsSolvedToday] = useState<number>(18);
 
+  // Automated Revision Folders ('My Mistakes' Feature)
+  const [mistakenQuestions, setMistakenQuestions] = useState<Question[]>(() => {
+    // Pre-populate with 2 representative anatomy and pathology mistakes
+    return [QUESTIONS_BANK[0], QUESTIONS_BANK[1]];
+  });
+
+  // Step-by-Step Custom Mock Test Builder states
+  const [customExams, setCustomExams] = useState<Exam[]>([]);
+
   // Simulator Progress State
   const [progress, setProgress] = useState<UserProgress>({
     streakCount: 7,
@@ -106,8 +118,391 @@ export default function App() {
     }
   });
 
-  const [activeSegment, setActiveSegment] = useState<'simulation' | 'export'>('simulation');
-  const [questions, setQuestions] = useState<Question[]>(QUESTIONS_BANK);
+  const [activeSegment, setActiveSegment] = useState<'simulation' | 'export' | 'database'>('simulation');
+  const [questions, setQuestions] = useState<Question[]>(() => {
+    const cached = localStorage.getItem('fcps_cloud_questions');
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (e) {
+        console.error('Failed to parse cached questions', e);
+      }
+    }
+    return QUESTIONS_BANK;
+  });
+
+  const handleUpdateQuestions = (newQs: Question[]) => {
+    setQuestions(newQs);
+    try {
+      localStorage.setItem('fcps_cloud_questions', JSON.stringify(newQs));
+    } catch (e) {
+      console.warn('Storage quota exceeded; cached in memory only.', e);
+    }
+  };
+
+  // Automated silent background sync (every day / on startup) from Google Sheets published URL
+  useEffect(() => {
+    const runAutoSync = async () => {
+      const stored = localStorage.getItem('fcps_sheet_id');
+      const spreadsheetId = (!stored || stored === '2PACX-1vS_gZ448jpxmCH8m47V4Y18k4DsdbyOon3qK3Hn5Lz_16Y_mY-gOP-uR7uR66-Ior1x_gOH4L9_Q2R')
+        ? '1OvzxOaT5cGZWKjkdcQ25uOFYDs5glgc_xTwGZs-jCUM'
+        : stored;
+      const apiKey = localStorage.getItem('fcps_sheets_api_key') || '';
+      const rangeName = localStorage.getItem('fcps_sheet_range') || 'Sheet1!A1:K300';
+      const syncMethod = localStorage.getItem('fcps_sync_method') || 'csv';
+
+      const lastSync = localStorage.getItem('fcps_cloud_last_sync');
+      const now = Date.now();
+      const oneDayMs = 24 * 60 * 60 * 1000;
+
+      // Skip sync if already successfully loaded within last 24h
+      if (lastSync && (now - parseInt(lastSync, 10)) < oneDayMs) {
+        console.log('FCPS Auto-Sync: Active question pool was refreshed recently. Skipping update.');
+        return;
+      }
+
+      console.log('FCPS Auto-Sync: Starting silent background fetch from online Google Sheets...');
+
+      try {
+        let incomingQuestions: Question[] = [];
+
+        if (syncMethod === 'api' && apiKey.trim()) {
+          const encodedRange = encodeURIComponent(rangeName);
+          const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId.trim()}/values/${encodedRange}?key=${apiKey.trim()}`;
+          
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            const rows: string[][] = data.values;
+
+            if (rows && rows.length >= 2) {
+              const headers = rows[0].map((h: string) => h.trim().toLowerCase());
+              const colMap: Record<string, number> = {};
+              headers.forEach((h: string, idx: number) => {
+                colMap[h] = idx;
+              });
+
+              const getVal = (rowArr: string[], keys: string[], defaultVal = '') => {
+                for (const key of keys) {
+                  const idx = colMap[key];
+                  if (idx !== undefined && rowArr[idx] !== undefined) {
+                    return rowArr[idx].trim();
+                  }
+                }
+                return defaultVal;
+              };
+
+              incomingQuestions = rows.slice(1).map((row: string[], index: number) => {
+                const id = getVal(row, ['id', 'questionid'], `sheets-api-${index}-${Date.now()}`);
+                const typeStr = getVal(row, ['type'], 'SBA').toUpperCase();
+                const type: 'SBA' | 'MTF' = typeStr.includes('MTF') ? 'MTF' : 'SBA';
+                const tagsRaw = getVal(row, ['tags', 'tag', 'subject'], '[Medicine & Allied]');
+                
+                let subjectStr = tagsRaw;
+                let topicStr = tagsRaw;
+                
+                const bracketMatch = tagsRaw.match(/\[(.*?)\]/);
+                if (bracketMatch) {
+                  subjectStr = bracketMatch[1];
+                  topicStr = tagsRaw.replace(bracketMatch[0], '').trim() || 'Syllabus Chapter Unit';
+                } else if (tagsRaw.startsWith('[') && tagsRaw.endsWith(']')) {
+                  subjectStr = tagsRaw.slice(1, -1);
+                  topicStr = 'Syllabus Chapter Chapter Unit';
+                }
+
+                const validSubjects: SubjectCategory[] = [
+                  'Anatomy',
+                  'Physiology & Biochemistry',
+                  'Pathology & Microbiology',
+                  'Medicine & Allied',
+                  'Surgery & Allied',
+                  'Gynecology & Obstetrics',
+                  'Pediatrics'
+                ];
+                
+                let subject: SubjectCategory = 'Medicine & Allied';
+                const cleanSub = subjectStr.toLowerCase();
+                
+                if (cleanSub.includes('anatomy')) subject = 'Anatomy';
+                else if (cleanSub.includes('physio') || cleanSub.includes('biochem')) subject = 'Physiology & Biochemistry';
+                else if (cleanSub.includes('patho') || cleanSub.includes('micro')) subject = 'Pathology & Microbiology';
+                else if (cleanSub.includes('surg') || cleanSub.includes(' bailey')) subject = 'Surgery & Allied';
+                else if (cleanSub.includes('gyn') || cleanSub.includes('obs')) subject = 'Gynecology & Obstetrics';
+                else if (cleanSub.includes('peds') || cleanSub.includes('pedi')) subject = 'Pediatrics';
+                else {
+                  const matched = validSubjects.find(s => s.toLowerCase() === cleanSub);
+                  if (matched) subject = matched;
+                }
+
+                const questionTextRaw = getVal(row, ['questiontext', 'question', 'question text'], 'No body text supplied.');
+                
+                const optA = getVal(row, ['optiona', 'option a', 'a'], '');
+                const optB = getVal(row, ['optionb', 'option b', 'b'], '');
+                const optC = getVal(row, ['optionc', 'option c', 'c'], '');
+                const optD = getVal(row, ['optiond', 'option d', 'd'], '');
+                const optE = getVal(row, ['optione', 'option e', 'e'], '');
+
+                const options: string[] = [];
+                if (optA) options.push(optA);
+                if (optB) options.push(optB);
+                if (optC) options.push(optC);
+                if (optD) options.push(optD);
+                if (optE) options.push(optE);
+
+                while (options.length < 5) {
+                  options.push(`Prepopulated Option ${String.fromCharCode(65 + options.length)}`);
+                }
+
+                const rawCorrect = getVal(row, ['correctanswer', 'correct', 'answer', 'correctanswerindex'], 'A');
+                let correctAnswerIndex = 0;
+                let mtfAnswers: string[] | undefined = undefined;
+
+                if (type === 'MTF') {
+                  let truthList: string[] = [];
+                  if (rawCorrect.includes(',')) {
+                    truthList = rawCorrect.split(',').map((s: string) => s.trim().toUpperCase());
+                  } else {
+                    truthList = rawCorrect.split('').map((s: string) => s.toUpperCase());
+                  }
+                  while (truthList.length < 5) {
+                    truthList.push('F');
+                  }
+                  mtfAnswers = truthList.slice(0, 5);
+                  const firstTrueIdx = truthList.findIndex(t => t === 'T');
+                  correctAnswerIndex = firstTrueIdx !== -1 ? firstTrueIdx : 0;
+                } else {
+                  const normCorrect = rawCorrect.trim().toUpperCase();
+                  if (normCorrect === 'A' || normCorrect === '1') correctAnswerIndex = 0;
+                  else if (normCorrect === 'B' || normCorrect === '2') correctAnswerIndex = 1;
+                  else if (normCorrect === 'C' || normCorrect === '3') correctAnswerIndex = 2;
+                  else if (normCorrect === 'D' || normCorrect === '4') correctAnswerIndex = 3;
+                  else if (normCorrect === 'E' || normCorrect === '5') correctAnswerIndex = 4;
+                  else {
+                    const parsedNum = parseInt(rawCorrect, 10);
+                    correctAnswerIndex = isNaN(parsedNum) ? 0 : Math.max(0, Math.min(4, parsedNum));
+                  }
+                }
+
+                const expAndRef = getVal(row, ['explanation', 'rationale', 'explanationtext'], '');
+                let explanation = expAndRef;
+                let reference = 'CPSP Syllabus Guideline';
+                const refBracketMatch = expAndRef.match(/\[(.*?)\]/);
+                if (refBracketMatch) {
+                  reference = refBracketMatch[1];
+                  explanation = expAndRef.replace(refBracketMatch[0], '').trim();
+                }
+
+                return {
+                  id,
+                  subject,
+                  topic: topicStr,
+                  question: questionTextRaw,
+                  options,
+                  correctAnswerIndex,
+                  explanation,
+                  reference,
+                  type,
+                  mtfAnswers
+                };
+              });
+            }
+          }
+        } else {
+          // CSV Parser fallback/primary path (highly secure & works without any API Key)
+          const csvUrl = getGoogleSheetsCsvUrl(spreadsheetId);
+
+          const res = await fetch(csvUrl);
+          if (res.ok) {
+            const text = await res.text();
+            
+            const splitRowLocal = (line: string): string[] => {
+              const result: string[] = [];
+              let currentVal = '';
+              let inQuotes = false;
+              for (let i = 0; i < line.length; i++) {
+                const char = line[ i ];
+                if (char === '"') {
+                  if (inQuotes && line[i + 1] === '"') {
+                    currentVal += '"';
+                    i++;
+                  } else {
+                    inQuotes = !inQuotes;
+                  }
+                } else if (char === ',' && !inQuotes) {
+                  result.push(currentVal);
+                  currentVal = '';
+                } else {
+                  currentVal += char;
+                }
+              }
+              result.push(currentVal);
+              return result;
+            };
+
+            const lines: string[] = [];
+            let currentLine = '';
+            let inQuotes = false;
+            for (let i = 0; i < text.length; i++) {
+              const char = text[i];
+              if (char === '"') {
+                inQuotes = !inQuotes;
+                currentLine += char;
+              } else if ((char === '\n' || char === '\r') && !inQuotes) {
+                if (currentLine.trim()) {
+                  lines.push(currentLine);
+                }
+                currentLine = '';
+              } else {
+                currentLine += char;
+              }
+            }
+            if (currentLine.trim()) {
+              lines.push(currentLine);
+            }
+
+            if (lines.length > 0) {
+              const headers = splitRowLocal(lines[0]).map(h => h.replace(/^"|"$/g, '').trim().toLowerCase());
+              const parsedRows: Record<string, string>[] = [];
+
+              for (let i = 1; i < lines.length; i++) {
+                const values = splitRowLocal(lines[i]);
+                const obj: Record<string, string> = {};
+                headers.forEach((header, idxVal) => {
+                  const val = values[idxVal];
+                  obj[header] = val ? val.replace(/^"|"$/g, '').trim() : '';
+                });
+                parsedRows.push(obj);
+              }
+
+              incomingQuestions = parsedRows.map((row, index) => {
+                const id = row['id'] || `sheets-csv-${index}-${Date.now()}`;
+                const typeStr = (row['type'] || 'SBA').toUpperCase();
+                const type: 'SBA' | 'MTF' = typeStr.includes('MTF') ? 'MTF' : 'SBA';
+                
+                let tagsRaw = row['tags'] || row['subject'] || '[Medicine & Allied] General chapter';
+                let subjectStr = tagsRaw;
+                let topicStr = tagsRaw;
+                
+                const bracketMatch = tagsRaw.match(/\[(.*?)\]/);
+                if (bracketMatch) {
+                  subjectStr = bracketMatch[1];
+                  topicStr = tagsRaw.replace(bracketMatch[0], '').trim() || 'Syllabus Chapter Unit';
+                } else if (tagsRaw.startsWith('[') && tagsRaw.endsWith(']')) {
+                  subjectStr = tagsRaw.slice(1, -1);
+                  topicStr = 'Syllabus Chapter Chapter Unit';
+                }
+
+                const validSubjects: SubjectCategory[] = [
+                  'Anatomy',
+                  'Physiology & Biochemistry',
+                  'Pathology & Microbiology',
+                  'Medicine & Allied',
+                  'Surgery & Allied',
+                  'Gynecology & Obstetrics',
+                  'Pediatrics'
+                ];
+                
+                let subject: SubjectCategory = 'Medicine & Allied';
+                const cleanSub = subjectStr.toLowerCase();
+                
+                if (cleanSub.includes('anatomy')) subject = 'Anatomy';
+                else if (cleanSub.includes('physio') || cleanSub.includes('biochem')) subject = 'Physiology & Biochemistry';
+                else if (cleanSub.includes('patho') || cleanSub.includes('micro')) subject = 'Pathology & Microbiology';
+                else if (cleanSub.includes('surg') || cleanSub.includes(' bailey')) subject = 'Surgery & Allied';
+                else if (cleanSub.includes('gyn') || cleanSub.includes('obs')) subject = 'Gynecology & Obstetrics';
+                else if (cleanSub.includes('peds') || cleanSub.includes('pedi')) subject = 'Pediatrics';
+                else {
+                  const matched = validSubjects.find(s => s.toLowerCase() === cleanSub);
+                  if (matched) subject = matched;
+                }
+
+                const questionTextRaw = row['questiontext'] || row['question'] || 'No body text supplied.';
+                
+                const optA = row['optiona'] || row['a'] || '';
+                const optB = row['optionb'] || row['b'] || '';
+                const optC = row['optionc'] || row['c'] || '';
+                const optD = row['optiond'] || row['d'] || '';
+                const optE = row['optione'] || row['e'] || '';
+
+                const options: string[] = [];
+                if (optA) options.push(optA);
+                if (optB) options.push(optB);
+                if (optC) options.push(optC);
+                if (optD) options.push(optD);
+                if (optE) options.push(optE);
+
+                while (options.length < 5) {
+                  options.push(`Prepopulated Option ${String.fromCharCode(65 + options.length)}`);
+                }
+
+                const rawCorrect = row['correctanswer'] || row['correct'] || row['correctanswerindex'] || 'A';
+                let correctAnswerIndex = 0;
+                let mtfAnswers: string[] | undefined = undefined;
+
+                if (type === 'MTF') {
+                  let truthList: string[] = [];
+                  if (rawCorrect.includes(',')) {
+                    truthList = rawCorrect.split(',').map((s: string) => s.trim().toUpperCase());
+                  } else {
+                    truthList = rawCorrect.split('').map((s: string) => s.toUpperCase());
+                  }
+                  while (truthList.length < 5) {
+                    truthList.push('F');
+                  }
+                  mtfAnswers = truthList.slice(0, 5);
+                  const firstTrueIdx = truthList.findIndex(t => t === 'T');
+                  correctAnswerIndex = firstTrueIdx !== -1 ? firstTrueIdx : 0;
+                } else {
+                  const normCorrect = rawCorrect.trim().toUpperCase();
+                  if (normCorrect === 'A' || normCorrect === '1') correctAnswerIndex = 0;
+                  else if (normCorrect === 'B' || normCorrect === '2') correctAnswerIndex = 1;
+                  else if (normCorrect === 'C' || normCorrect === '3') correctAnswerIndex = 2;
+                  else if (normCorrect === 'D' || normCorrect === '4') correctAnswerIndex = 3;
+                  else if (normCorrect === 'E' || normCorrect === '5') correctAnswerIndex = 4;
+                  else {
+                    const parsedNum = parseInt(rawCorrect, 10);
+                    correctAnswerIndex = isNaN(parsedNum) ? 0 : Math.max(0, Math.min(4, parsedNum));
+                  }
+                }
+
+                const expAndRef = row['explanation'] || row['explanations'] || '';
+                let explanation = expAndRef;
+                let reference = 'CPSP Syllabus Guideline';
+                const refBracketMatch = expAndRef.match(/\[(.*?)\]/);
+                if (refBracketMatch) {
+                  reference = refBracketMatch[1];
+                  explanation = expAndRef.replace(refBracketMatch[0], '').trim();
+                }
+
+                return {
+                  id,
+                  subject,
+                  topic: topicStr,
+                  question: questionTextRaw,
+                  options,
+                  correctAnswerIndex,
+                  explanation,
+                  reference,
+                  type,
+                  mtfAnswers
+                };
+              });
+            }
+          }
+        }
+
+        if (incomingQuestions.length > 0) {
+          handleUpdateQuestions(incomingQuestions);
+          localStorage.setItem('fcps_cloud_last_sync', now.toString());
+          console.log(`FCPS Auto-Sync: Successfully gathered & synchronized ${incomingQuestions.length} medical clinical items silently.`);
+        }
+      } catch (err) {
+        console.warn('FCPS Auto-Sync silent request encountered error:', err);
+      }
+    };
+
+    runAutoSync();
+  }, []);
 
   // Trigger exam launcher from external controls
   const [startExamTrigger, setStartExamTrigger] = useState<string | null>(null);
@@ -132,17 +527,37 @@ export default function App() {
   };
 
   // Auth screen handlers
-  const handleAuthSuccess = (doctorData: { name: string; email: string; bmdcNumber: string }) => {
+  const handleAuthSuccess = (doctorData: { 
+    name: string; 
+    email: string; 
+    bmdcNumber: string; 
+    mobile: string; 
+    state?: any;
+  }) => {
     setIsAuthenticated(true);
-    setCurrentUser(doctorData);
-    localStorage.setItem('fcps_auth_logged_in', 'true');
-    localStorage.setItem('fcps_auth_user', JSON.stringify(doctorData));
-
-    // Align matching metadata profile parameters
-    setDoctor(prev => ({
-      ...prev,
+    const simplifiedUser = {
       name: doctorData.name,
-    }));
+      email: doctorData.email,
+      bmdcNumber: doctorData.bmdcNumber,
+      mobile: doctorData.mobile
+    };
+    setCurrentUser(simplifiedUser);
+    localStorage.setItem('fcps_auth_logged_in', 'true');
+    localStorage.setItem('fcps_auth_user', JSON.stringify(simplifiedUser));
+
+    // If cloud state returned, restore everything instantly
+    if (doctorData.state) {
+      if (doctorData.state.profile) setDoctor(doctorData.state.profile);
+      if (doctorData.state.progress) setProgress(doctorData.state.progress);
+      if (doctorData.state.mistakes) setMistakenQuestions(doctorData.state.mistakes);
+      if (doctorData.state.customExams) setCustomExams(doctorData.state.customExams);
+    } else {
+      // Align matching metadata profile parameters
+      setDoctor(prev => ({
+        ...prev,
+        name: doctorData.name,
+      }));
+    }
     setEditName(doctorData.name);
   };
 
@@ -152,6 +567,35 @@ export default function App() {
     localStorage.removeItem('fcps_auth_logged_in');
     localStorage.removeItem('fcps_auth_user');
   };
+
+  // Real-time Cloud persistence synchronization (Debounced save triggered on state change)
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser?.mobile) return;
+
+    const syncStateToCloud = async () => {
+      try {
+        await fetch('/api/user/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mobile: currentUser.mobile,
+            profile: doctor,
+            progress: progress,
+            mistakes: mistakenQuestions,
+            customExams: customExams
+          })
+        });
+      } catch (err) {
+        console.error('Failed to sync to cloud server:', err);
+      }
+    };
+
+    const delayTimer = setTimeout(() => {
+      syncStateToCloud();
+    }, 1200);
+
+    return () => clearTimeout(delayTimer);
+  }, [doctor, progress, mistakenQuestions, customExams, isAuthenticated, currentUser?.mobile]);
 
   // Dynamic Remediation Logic (Shikho Style)
   // Invoked when they fail any question inside Practice mode
@@ -175,6 +619,11 @@ export default function App() {
 
     // 2. Adaptive remediation processing: If answer is wrong, update weak chapters
     if (!correct && question) {
+      setMistakenQuestions(prev => {
+        if (prev.some(item => item.id === question.id)) return prev;
+        return [...prev, question];
+      });
+
       setWeakChapters(prev => {
         const matchIdx = prev.findIndex(item => item.chapter.toLowerCase().includes(question.topic.toLowerCase()) || item.category === question.subject);
         if (matchIdx >= 0) {
@@ -225,6 +674,17 @@ export default function App() {
 
     // Bulk adaptive remediation on mock mistakes
     if (wrongQuestions && wrongQuestions.length > 0) {
+      // Append each wrong question to the mistakes revision folder
+      setMistakenQuestions(prev => {
+        const next = [...prev];
+        wrongQuestions.forEach(q => {
+          if (!next.some(item => item.id === q.id)) {
+            next.push(q);
+          }
+        });
+        return next;
+      });
+
       setWeakChapters(prev => {
         const nextList = [...prev];
         wrongQuestions.slice(0, 3).forEach(q => {
@@ -250,10 +710,88 @@ export default function App() {
     }
   };
 
+  const handleLaunchCustomTest = (subject: SubjectCategory, topic: string, questionCount: number, sbaOnly: boolean, includeMixed: boolean) => {
+    let pool = QUESTIONS_BANK;
+    if (!includeMixed) {
+      pool = pool.filter(q => q.subject === subject);
+    }
+    
+    // Sort and slice
+    const selected = [...pool].sort(() => 0.5 - Math.random()).slice(0, Math.round(questionCount));
+    
+    const newExam: Exam = {
+      id: `custom-${Date.now()}`,
+      title: `Custom ${subject} Mock (${topic || 'All Topics'})`,
+      subject: subject,
+      questionCount: selected.length,
+      durationMinutes: Math.max(5, Math.ceil(selected.length * 1.5)),
+      startTime: 'Custom Built Drill',
+      status: 'Active' as const,
+      questions: selected
+    };
+    
+    setCustomExams(prev => [...prev, newExam]);
+    setStartExamTrigger(newExam.id);
+  };
+
   const handleDrillChapterPractice = (category: SubjectCategory) => {
     // Simply logging dynamic drill selection or filter inside simulation
     console.log(`Drilling category ${category} in Practice Deck.`);
   };
+
+  // Build the dynamic mock papers on-the-fly to support the grid launcher buttons
+  const paper1Exam: Exam = {
+    id: 'paper-1-exam',
+    title: 'Paper I (Anatomy/Physiology) Rapid Drill',
+    subject: 'Anatomy' as SubjectCategory,
+    questionCount: 10,
+    durationMinutes: 15,
+    startTime: 'Dynamic Prep Drill',
+    status: 'Active' as const,
+    questions: QUESTIONS_BANK.filter(q => q.subject === 'Anatomy' || q.subject === 'Physiology & Biochemistry')
+  };
+
+  const paper2Exam: Exam = {
+    id: 'paper-2-exam',
+    title: 'Paper II (Pathology/Microbiology) Master Drill',
+    subject: 'Pathology & Microbiology' as SubjectCategory,
+    questionCount: 10,
+    durationMinutes: 15,
+    startTime: 'Dynamic Prep Drill',
+    status: 'Active' as const,
+    questions: QUESTIONS_BANK.filter(q => q.subject === 'Pathology & Microbiology')
+  };
+
+  const paper3Exam: Exam = {
+    id: 'paper-3-exam',
+    title: 'Paper III (Pharmacology/Medicine) Boost Study',
+    subject: 'Medicine & Allied' as SubjectCategory,
+    questionCount: 10,
+    durationMinutes: 15,
+    startTime: 'Dynamic Prep Drill',
+    status: 'Active' as const,
+    questions: QUESTIONS_BANK.filter(q => q.subject === 'Medicine & Allied' || q.subject === 'Physiology & Biochemistry')
+  };
+
+  const customMistakesExam: Exam = {
+    id: 'my-mistakes-exam',
+    title: 'My Mistakes - Automated Revision Set',
+    subject: 'Medicine & Allied' as SubjectCategory,
+    questionCount: mistakenQuestions.length,
+    durationMinutes: Math.max(5, Math.ceil(mistakenQuestions.length * 1.5)),
+    startTime: 'Simulated Revision Queue',
+    status: 'Active' as const,
+    questions: mistakenQuestions
+  };
+
+  const computedExams = [
+    ...LIVE_EXAMS_DATA,
+    ...customExams,
+    customMistakesExam,
+    paper1Exam,
+    paper2Exam,
+    paper3Exam
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col justify-between" id="app-root-layout">
@@ -267,17 +805,27 @@ export default function App() {
             </div>
             <div>
               <h1 className="text-base font-bold text-slate-900 leading-snug flex items-center gap-1.5">
-                CPSP FCPS Prep Companion <span className="bg-teal-50 text-teal-700 text-[10px] font-mono font-bold px-2 py-0.5 rounded">v2.0</span>
+                BCPS BDFCPS Prep Companion <span className="bg-teal-50 text-teal-700 text-[10px] font-mono font-bold px-2 py-0.5 rounded">v2.0</span>
               </h1>
-              <p className="text-[11px] text-slate-400 font-medium">College of Physicians & Surgeons Pakistan Specialization Portal</p>
+              <p className="text-[11px] text-slate-400 font-medium">Bangladesh College of Physicians & Surgeons (BCPS) Specialization Portal</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <span className="text-xs font-mono font-semibold text-slate-500">Database Connection:</span>
             <span className="bg-emerald-50 text-emerald-800 text-[10px] font-bold px-2.5 py-1 rounded-full border border-emerald-250 select-none flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-550 animate-ping" /> Synchronized Offline
             </span>
+            {isAuthenticated && (
+              <button
+                onClick={handleLogOut}
+                className="ml-2 flex items-center gap-1.5 px-3 py-1.5 border border-rose-200 text-rose-600 bg-rose-50/50 rounded-xl text-xs font-bold hover:bg-rose-100 hover:text-rose-700 transition active:scale-95 cursor-pointer"
+                id="header-logout-btn"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Log Out</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -497,6 +1045,17 @@ export default function App() {
                 <Smartphone className="w-4 h-4" /> Interactive Smartphone Simulator
               </button>
               <button
+                onClick={() => setActiveSegment('database')}
+                className={`py-3 px-6 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                  activeSegment === 'database' 
+                    ? 'border-teal-500 text-teal-600' 
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+                id="tab-btn-database"
+              >
+                <Database className="w-4 h-4" /> Cloud Database Sync
+              </button>
+              <button
                 onClick={() => setActiveSegment('export')}
                 className={`py-3 px-6 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
                   activeSegment === 'export' 
@@ -516,9 +1075,9 @@ export default function App() {
                 <div className="flex justify-center">
                   <PhoneSimulator 
                     doctor={doctor}
-                    exams={LIVE_EXAMS_DATA}
+                    exams={computedExams}
                     questions={questions}
-                    onUpdateQuestions={setQuestions}
+                    onUpdateQuestions={handleUpdateQuestions}
                     progress={progress}
                     onSolveQuestion={handleSolveQuestion}
                     onCompleteExam={handleCompleteExam}
@@ -529,9 +1088,16 @@ export default function App() {
                     }}
                     questionsSolvedToday={questionsSolvedToday}
                     
+                    // Mistakes and custom builder
+                    mistakenQuestions={mistakenQuestions}
+                    onLaunchCustomTest={handleLaunchCustomTest}
+                    onSetStartExamTrigger={(examId: string) => setStartExamTrigger(examId)}
+
                     // Auth state props
                     isAuthenticated={isAuthenticated}
                     onAuthSuccess={handleAuthSuccess}
+                    onLogout={handleLogOut}
+                    onUpdateProfile={setDoctor}
 
                     // Remediation props
                     weakChapters={weakChapters}
@@ -600,6 +1166,13 @@ export default function App() {
                 </div>
 
               </div>
+            ) : activeSegment === 'database' ? (
+              <div className="animate-fadeIn">
+                <DatabaseManagement 
+                  questions={questions}
+                  onUpdateQuestions={handleUpdateQuestions}
+                />
+              </div>
             ) : (
               <div className="animate-fadeIn">
                 <CodeExportPanel />
@@ -614,9 +1187,9 @@ export default function App() {
       {/* Footer credits */}
       <footer className="bg-slate-900 border-t border-slate-800 text-slate-400 text-xs py-6 text-center shrink-0" id="global-layout-footer">
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <p>© 2526 College of Physicians and Surgeons Pakistan. All Rights Reserved.</p>
+          <p>© 2026 Bangladesh College of Physicians and Surgeons (BCPS). All Rights Reserved.</p>
           <p className="text-slate-500 flex items-center gap-1">
-            Built for doctors preparing Part 1 with slate-teal theme. Crafted with <Heart className="w-3 h-3 text-rose-500 fill-rose-500" />.
+            Built for doctors preparing for FCPS Part I in Bangladesh. Crafted with <Heart className="w-3 h-3 text-rose-500 fill-rose-500" />.
           </p>
         </div>
       </footer>

@@ -1,6 +1,6 @@
 {
-  "name": "FCPS Exam Prep Simulator",
-  "description": "An interactive, cross-platform React Native (Expo) mobile application simulator for doctors preparing for FCPS exams, featuring live tests, practice units, progress analytics, and fully-executable React Native source code exports.",
+  "name": "BDFCPS Exam Simulator",
+  "description": "An interactive, cross-platform React Native (Expo) mobile application simulator for Bangladeshi doctors preparing for the BCPS FCPS exams, featuring live tests, practice units, progress analytics, and fully-executable React Native source code exports.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

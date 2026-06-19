@@ -52,7 +52,7 @@ export default function AnalyticsTab({ progress, doctorName = 'Dr. Sarah Ahmed' 
 
   const userRow = {
     name: doctorName.startsWith('Dr.') ? doctorName : `Dr. ${doctorName}`,
-    specialty: 'You (CPSP Candidate)',
+    specialty: 'You (BCPS Candidate)',
     score: progress.averageScorePercentage,
     submissionTime: '07:13 AM',
     isCurrentUser: true
@@ -75,7 +75,7 @@ export default function AnalyticsTab({ progress, doctorName = 'Dr. Sarah Ahmed' 
     <div className="flex flex-col overflow-y-auto max-h-[580px] p-4 space-y-5 pb-20 scrollbar-thin scrollbar-thumb-slate-300" id="analytics-studio-tab">
       
       <div className="space-y-1">
-        <h2 className="text-base font-bold text-slate-800">CPSP Diagnostic Studio</h2>
+        <h2 className="text-base font-bold text-slate-800">BCPS Diagnostic Studio</h2>
         <p className="text-xs text-slate-500">
           Real-time analytics of your preparation strengths, mock pacing, and focus indicators.
         </p>
@@ -129,8 +129,8 @@ export default function AnalyticsTab({ progress, doctorName = 'Dr. Sarah Ahmed' 
         </div>
       </div>
 
-      {/* Chorcha-style Live Rank & Payout Tiers Leaderboard */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-4" id="chorcha-leaderboard-premium">
+      {/* BDFCPS-style Live Rank & Payout Tiers Leaderboard */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-4" id="bdfcps-leaderboard-premium">
         
         <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
           <h3 className="text-xs font-extrabold text-slate-900 flex items-center gap-1.5">
@@ -138,7 +138,7 @@ export default function AnalyticsTab({ progress, doctorName = 'Dr. Sarah Ahmed' 
             <span>Nationwide Peer Live Rankings</span>
           </h3>
           <span className="text-[8px] uppercase font-mono font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-100">
-            Chorcha Cash Pool Active
+            BDFCPS Cash Pool Active
           </span>
         </div>
 

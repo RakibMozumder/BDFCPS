@@ -1,0 +1,57 @@
+{
+  "entities": {
+    "users": {
+      "fields": {
+        "mobile": {
+          "type": "string",
+          "description": "Primary identifier for the user (mobile number)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Standard display name for the doctor account"
+        },
+        "email": {
+          "type": "string",
+          "description": "Optional email address"
+        },
+        "bmdcNumber": {
+          "type": "string",
+          "description": "BMDC Registration authority number"
+        },
+        "passwordHash": {
+          "type": "string",
+          "description": "Simple authentication secret store"
+        },
+        "profile": {
+          "type": "map",
+          "description": "Medical specialty target profile metadata parameters"
+        },
+        "progress": {
+          "type": "map",
+          "description": "Overall study progress stats, history items and category masteries"
+        },
+        "mistakes": {
+          "type": "array",
+          "description": "Saved customized mistakes/revision folder MCQs"
+        },
+        "customExams": {
+          "type": "array",
+          "description": "User created custom-made exams parameters and state"
+        },
+        "createdAt": {
+          "type": "timestamp"
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": {
+      "users": {
+        "allow": {
+          "read": "request.auth != null",
+          "write": "request.auth != null"
+        }
+      }
+    }
+  }
+}

@@ -10,6 +10,17 @@ export interface DoctorProfile {
   hospital: string;
   avatar: string;
   dailyStudyGoal?: number; // Target number of MCQs per day
+  birthDate?: string;
+  studentStatus?: string;
+  address?: string;
+  institution?: string;
+  targetTopic?: string;
+  batch?: string;
+  hapticsEnabled?: boolean;
+  soundEffectsEnabled?: boolean;
+  linkedFacebook?: boolean;
+  linkedGoogle?: boolean;
+  linkedApple?: boolean;
 }
 
 export type SubjectCategory =
@@ -30,6 +41,8 @@ export interface Question {
   correctAnswerIndex: number; // 0-4
   explanation: string;
   reference: string; // e.g., "Harrison's 21st Ed, p. 1420"
+  type?: 'SBA' | 'MTF';
+  mtfAnswers?: string[]; // e.g., ["T", "T", "F", "F", "T"]
 }
 
 export interface Exam {

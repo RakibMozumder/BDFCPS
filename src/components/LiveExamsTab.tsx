@@ -541,9 +541,9 @@ export default function LiveExamsTab({ exams, onCompleteExam, startExamId, clear
     <div className="flex flex-col overflow-y-auto max-h-[580px] p-4 space-y-4 pb-16 scrollbar-thin scrollbar-thumb-slate-300">
       
       <div className="space-y-1">
-        <h2 className="text-base font-bold text-slate-800">CPSP Live Examination Desk</h2>
+        <h2 className="text-base font-bold text-slate-800">BCPS Live Examination Desk</h2>
         <p className="text-xs text-slate-500">
-          Engage in scheduled Pakistan-wide mock exams targeting the actual FCPS format with real-time CBT system limits.
+          Engage in scheduled Bangladesh-wide mock exams targeting the actual FCPS format with real-time CBT system limits.
         </p>
       </div>
 
