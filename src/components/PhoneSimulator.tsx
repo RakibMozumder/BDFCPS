@@ -9,8 +9,7 @@ import {
   Battery, 
   Signal, 
   ShieldCheck, 
-  Lock,
-  LogOut
+  Lock
 } from 'lucide-react';
 import { DoctorProfile, Exam, Question, UserProgress, SubjectCategory } from '../types';
 import HomeTab from './HomeTab';
@@ -19,6 +18,7 @@ import PracticeTab from './PracticeTab';
 import AnalyticsTab from './AnalyticsTab';
 import AuthScreen from './AuthScreen';
 import ProfileTab from './ProfileTab';
+const bdfcpsLogo = "/src/assets/images/bdfcps_logo_1782055989338.jpg";
 
 interface WeakChapter {
   chapter: string;
@@ -34,11 +34,17 @@ interface PhoneSimulatorProps {
   questions: Question[];
   progress: UserProgress;
   onSolveQuestion: (correct: boolean, question?: Question) => void;
-  onCompleteExam: (score: number, wrongQuestions?: Question[]) => void;
+  onCompleteExam: (score: number, wrongQuestions?: Question[], totalQuestions?: number, subject?: SubjectCategory) => void;
   startExamTrigger?: string | null;
   clearStartExamTrigger?: () => void;
   onChangeTabInSimulator?: (tabId: string) => void;
   onUpdateQuestions?: (qs: Question[]) => void;
+  sheetSyncNotification?: {
+    addedCount: number;
+    totalCount: number;
+    sheetName: string;
+  } | null;
+  onDismissSyncNotification?: () => void;
 
   // Mistakes and custom builder
   mistakenQuestions: Question[];
@@ -75,6 +81,8 @@ export default function PhoneSimulator({
   clearStartExamTrigger,
   onChangeTabInSimulator,
   onUpdateQuestions,
+  sheetSyncNotification,
+  onDismissSyncNotification,
 
   // Mistakes and custom builder params
   mistakenQuestions,
@@ -97,6 +105,14 @@ export default function PhoneSimulator({
 }: PhoneSimulatorProps) {
   const [platform, setPlatform] = useState<'iOS' | 'Android'>('iOS');
   const [activeTab, setActiveTab] = useState<'Home' | 'Live' | 'Practice' | 'Analytics' | 'Profile'>('Home');
+  const [showLocalSplash, setShowLocalSplash] = useState<boolean>(true);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowLocalSplash(false);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
   const [batteryLevel] = useState<number>(98);
 
   // Sync clock time (simulate actual device status clock)
@@ -269,51 +285,75 @@ export default function PhoneSimulator({
             </div>
           </div>
 
-          {/* Active Title Header */}
-          <div className="bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between shadow-sm relative z-10 shrink-0" id="dynamic-bar-header">
-            <div>
-              <h1 className="text-xs font-extrabold tracking-wider uppercase text-teal-400">FCPS COMPANION</h1>
-              <p className="text-[9px] text-slate-400 uppercase font-mono tracking-tight font-semibold">
-                {!isAuthenticated
-                  ? 'Candidate Verification Gate'
-                  : activeTab === 'Home' 
-                    ? 'Study Desk' 
-                    : activeTab === 'Live' 
-                      ? 'Mock Portal' 
-                      : activeTab === 'Practice' 
-                        ? 'Chapter Bank' 
-                        : 'Diagnostic Report'
-                }
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5">
-              {!isAuthenticated ? (
-                <Lock className="w-3.5 h-3.5 text-rose-500" />
-              ) : (
-                <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  <span className="text-[9px] font-mono text-slate-300 font-bold tracking-tight">CBT CLOUD</span>
-                  {onLogout && (
-                    <button 
-                      onClick={onLogout}
-                      className="ml-1.5 p-1 bg-slate-800 hover:bg-slate-700 active:scale-90 rounded-md transition text-slate-300 hover:text-red-400 cursor-pointer flex items-center justify-center"
-                      title="Log Out Companion"
-                    >
-                      <LogOut className="w-3 h-3" />
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
           {/* Real simulated React Screen Viewport body wrap */}
           <div className="flex-1 bg-slate-50 relative overflow-hidden flex flex-col">
-            {renderPlatformScreen()}
+            {sheetSyncNotification && (
+              <div 
+                className="absolute top-2 left-3 right-3 bg-slate-900/95 backdrop-blur text-white px-3 py-2.5 rounded-2xl shadow-xl border border-slate-700/50 z-50 flex items-start gap-2.5 transition-all duration-300" 
+                id="custom-push-notification"
+              >
+                <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center shrink-0 animate-bounce">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] font-bold text-teal-400 tracking-wider uppercase">BDFCPS Auto-Sync</span>
+                    <span className="text-[8px] text-slate-400">Just now</span>
+                  </div>
+                  <p className="text-[11px] text-slate-100 font-medium leading-tight mt-0.5">
+                    Added <strong className="text-teal-300">{sheetSyncNotification.addedCount} new questions</strong>! Prep bank expanded to {sheetSyncNotification.totalCount} MCQs.
+                  </p>
+                </div>
+                <button 
+                  onClick={onDismissSyncNotification}
+                  className="text-slate-400 hover:text-white p-0.5 transition-colors focus:outline-none"
+                  id="dismiss-push-notif"
+                >
+                  <span className="text-base leading-none">×</span>
+                </button>
+              </div>
+            )}
+            {showLocalSplash ? (
+              <div 
+                className="absolute inset-0 bg-[#fef2f4] flex flex-col items-center justify-center text-center p-6 z-40 select-none transition-all duration-300"
+                id="phone-local-splash-screen"
+                style={{ backgroundImage: 'radial-gradient(circle at 50% 38%, #ffffff 0%, #fff1f3 100%)' }}
+              >
+                <div className="relative mb-4">
+                  <div className="absolute -inset-3 rounded-full bg-rose-500/10 blur-xl pointer-events-none scale-105 animate-pulse" />
+                  <div className="relative w-24 h-24 rounded-2xl bg-white p-1.5 border border-rose-100 shadow-md flex items-center justify-center overflow-hidden">
+                    <img 
+                      src={bdfcpsLogo} 
+                      alt="BDFCPS App Logo" 
+                      className="w-full h-full object-contain rounded-xl animate-pulse"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-0.5">
+                  <h2 className="text-lg font-extrabold text-[#ea2c59] tracking-tight">
+                    BDFCPS Companion
+                  </h2>
+                  <p className="text-[10px] text-slate-400 font-bold tracking-wider uppercase">
+                    BCPS Medical Board Simulator
+                  </p>
+                </div>
+
+                {/* Progress indicator */}
+                <div className="flex items-center gap-1.5 mt-5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-bounce [animation-delay:-0.3s]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-bounce [animation-delay:-0.15s]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-bounce" />
+                </div>
+              </div>
+            ) : (
+              renderPlatformScreen()
+            )}
           </div>
 
           {/* Bottom Native Tab Navigation Bar (Locked behind authentication) */}
-          {isAuthenticated && (
+          {isAuthenticated && !showLocalSplash && (
             <div className="absolute bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200/80 px-3 flex justify-between items-center z-20 shadow-[0_-2px_12px_rgba(15,23,42,0.03)] pb-2 pt-1" id="tab-navigation-bar">
               <button 
                 onClick={() => setActiveTab('Home')}

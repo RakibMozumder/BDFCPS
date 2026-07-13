@@ -1,10 +1,16 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Security rules for user account synchronizations
     match /users/{userId} {
-      // Allow general read/write as this represents profile, study metrics, and student data
-      allow read, write: if userId != null && userId.size() > 0 && userId.size() < 128;
+      allow read, write: if true;
+    }
+
+    match /exam_results/{resultId} {
+      allow read, write: if true;
+    }
+
+    match /configs/{configId} {
+      allow read, write: if true;
     }
   }
 }

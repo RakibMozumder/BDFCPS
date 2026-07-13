@@ -2,12 +2,159 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>BDFCPS Exam Simulator</title>
+    
+    <!-- PWA Web App Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0d9488" />
+    
+    <!-- Cross-origin iframe environment safety and background error suppression -->
+    <script>
+      (function() {
+        // Create safe proxies for parent/top/opener to prevent cross-origin property read crashes (SecurityError)
+        function createSafeWindowProxy(win) {
+          if (!win) return win;
+          try {
+            return new Proxy(win, {
+              get: function(target, prop) {
+                // Safe properties that do not require origin check
+                if (prop === 'postMessage' || prop === 'focus' || prop === 'blur' || prop === 'close') {
+                  const val = target[prop];
+                  return typeof val === 'function' ? val.bind(target) : val;
+                }
+                try {
+                  return target[prop];
+                } catch (err) {
+                  // Suppress SecurityError on custom properties like $$typeof or state checks
+                  return undefined;
+                }
+              },
+              has: function(target, prop) {
+                try {
+                  return prop in target;
+                } catch (err) {
+                  return false;
+                }
+              },
+              ownKeys: function(target) {
+                try {
+                  return Reflect.ownKeys(target);
+                } catch (err) {
+                  return [];
+                }
+              },
+              getOwnPropertyDescriptor: function(target, prop) {
+                try {
+                  return Reflect.getOwnPropertyDescriptor(target, prop);
+                } catch (err) {
+                  return undefined;
+                }
+              }
+            });
+          } catch (e) {
+            return win;
+          }
+        }
+
+        const safeParent = createSafeWindowProxy(window.parent);
+        const safeTop = createSafeWindowProxy(window.top);
+        const safeOpener = createSafeWindowProxy(window.opener);
+
+        // Attempt override on window directly
+        const propertiesToOverride = {
+          parent: safeParent,
+          top: safeTop,
+          opener: safeOpener
+        };
+
+        for (const [key, value] of Object.entries(propertiesToOverride)) {
+          try {
+            Object.defineProperty(window, key, {
+              get: function() { return value; },
+              configurable: true,
+              enumerable: true
+            });
+          } catch (e) {
+            // Try redefining on Window prototype if direct definition fails
+            try {
+              Object.defineProperty(Window.prototype, key, {
+                get: function() { return value; },
+                configurable: true,
+                enumerable: true
+              });
+            } catch (e2) {
+              console.warn("Could not override window." + key + " globally:", e2);
+            }
+          }
+        }
+
+        const suppressPatterns = [
+          '$$typeof',
+          'SecurityError',
+          'Blocked a frame with origin',
+          'Should not already be working',
+          'cross-origin'
+        ];
+        
+        function matchesSuppress(msg) {
+          if (!msg) return false;
+          const str = String(msg);
+          return suppressPatterns.some(pattern => str.includes(pattern));
+        }
+
+        window.addEventListener('error', function(e) {
+          const message = e.message || (e.error && e.error.message);
+          if (matchesSuppress(message) || matchesSuppress(e.error)) {
+            console.warn('[Iframe Sandbox Warning Suppressed]:', message);
+            e.preventDefault();
+            e.stopPropagation();
+            return true;
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(e) {
+          const reason = e.reason;
+          if (reason && (matchesSuppress(reason.message) || matchesSuppress(reason))) {
+            console.warn('[Iframe Sandbox Promise Suppressed]:', reason);
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }, true);
+      })();
+    </script>
+    
+    <!-- Mobile Capabilities configuration (iOS Safari, Android Chrome) -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="BDFCPS" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="/pwa_icon.jpg" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- Clean up any service workers during local development to avoid Vite chunk-caching collisions -->
+    <script>
+      const isDev = window.location.hostname === 'localhost' || 
+                    window.location.hostname.includes('127.0.0.1') || 
+                    window.location.hostname.includes('-dev-');
+      
+      if (isDev && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          let reloaded = false;
+          for (const r of registrations) {
+            r.unregister().then((unregistered) => {
+              if (unregistered && !reloaded) {
+                reloaded = true;
+                console.log('[Dev Safety] Unregistered stale service worker chunk cache.');
+                window.location.reload();
+              }
+            });
+          }
+        });
+      }
+    </script>
   </body>
 </html>
 

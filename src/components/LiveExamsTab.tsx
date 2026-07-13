@@ -4,7 +4,7 @@ import { Exam, Question, SubjectCategory } from '../types';
 import CountdownTimer from './CountdownTimer';
 import { useCountdownTimer } from '../hooks/useCountdownTimer';
 
-const SHIKHO_SMART_NOTES_MAP: Record<string, { criteria: string[]; steps: string[]; citation: string }> = {
+const BDFCPS_SMART_NOTES_MAP: Record<string, { criteria: string[]; steps: string[]; citation: string }> = {
   q1: {
     criteria: [
       'Prolonged QTc interval on standard ECG (>450ms in males, >460ms in females).',
@@ -100,7 +100,7 @@ const SHIKHO_SMART_NOTES_MAP: Record<string, { criteria: string[]; steps: string
 
 interface LiveExamsTabProps {
   exams: Exam[];
-  onCompleteExam: (score: number, wrongQuestions?: Question[], totalQuestions?: number) => void;
+  onCompleteExam: (score: number, wrongQuestions?: Question[], totalQuestions?: number, subject?: SubjectCategory) => void;
   startExamId?: string | null;
   clearStartExamId?: () => void;
 }
@@ -130,7 +130,7 @@ export default function LiveExamsTab({ exams, onCompleteExam, startExamId, clear
       }
     });
     const percentage = Math.round((correct / activeExam.questions.length) * 100);
-    onCompleteExam(percentage, wrongQs, activeExam.questions.length);
+    onCompleteExam(percentage, wrongQs, activeExam.questions.length, activeExam.subject);
   }
 
   const { timeLeft, setTimeLeft } = useCountdownTimer({
@@ -271,157 +271,166 @@ export default function LiveExamsTab({ exams, onCompleteExam, startExamId, clear
 
     if (reviewMode) {
       return (
-        <div className="flex flex-col overflow-y-auto max-h-[580px] p-4 space-y-4 pb-16 scrollbar-thin scrollbar-thumb-slate-300">
-          <div className="flex items-center justify-between">
+        <div className="flex flex-col h-[580px] relative" id="review-desk-viewport">
+          {/* Top Sticky Header */}
+          <div className="bg-white border-b border-slate-100 px-4 py-2.5 flex items-center justify-between shrink-0 z-10">
             <button 
               onClick={() => { setShowResults(true); setReviewMode(false); }}
-              className="text-xs font-semibold text-slate-600 flex items-center gap-1 bg-slate-100 px-3 py-1.5 rounded-lg"
+              className="text-xs font-semibold text-slate-600 flex items-center gap-1 bg-slate-100 px-2.5 py-1.5 rounded-lg hover:bg-slate-200 active:scale-95 transition"
             >
-              <ArrowLeft className="w-3 h-3" /> Back to Scorecard
+              <ArrowLeft className="w-3" /> Back to Scorecard
             </button>
-            <span className="text-xs text-slate-500 font-bold">Question {currentQuestionIdx + 1} of {totalQuestions}</span>
+            <span className="text-xs text-slate-500 font-extrabold font-mono">
+              ITEM {currentQuestionIdx + 1} OF {totalQuestions}
+            </span>
           </div>
 
-          {/* Active Review MCQ */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-4 min-h-[220px]">
-            <div className="flex items-start gap-1.5">
-              <span className="bg-slate-100 text-slate-800 text-[10px] font-bold px-2 py-0.5 rounded shrink-0">
-                Q {currentQuestionIdx + 1}
-              </span>
-              <p className="text-slate-800 text-xs font-semibold leading-relaxed">{currentQuestion.question}</p>
-            </div>
+          {/* scrollable core review content */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-36 scrollbar-thin scrollbar-thumb-slate-300" id="review-desk-scrollbody">
+            {/* Active Review MCQ */}
+            <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-4 min-h-[220px]">
+              <div className="flex items-start gap-1.5">
+                <span className="bg-slate-100 text-slate-800 text-[10px] font-bold px-2 py-0.5 rounded shrink-0">
+                  Q {currentQuestionIdx + 1}
+                </span>
+                <p className="text-slate-800 text-xs font-semibold leading-relaxed">{currentQuestion.question}</p>
+              </div>
 
-            {/* Render choices with highlight mapping */}
-            <div className="space-y-2">
-              {currentQuestion.options.map((option, oIdx) => {
-                const userChoice = answers[currentQuestion.id];
-                const isCorrectOption = oIdx === currentQuestion.correctAnswerIndex;
-                const isUserWrongChoice = userChoice === oIdx && !isCorrectOption;
+              {/* Render choices with highlight mapping */}
+              <div className="space-y-2">
+                {currentQuestion.options.map((option, oIdx) => {
+                  const userChoice = answers[currentQuestion.id];
+                  const isCorrectOption = oIdx === currentQuestion.correctAnswerIndex;
+                  const isUserWrongChoice = userChoice === oIdx && !isCorrectOption;
 
-                let borderStyle = 'border-slate-100';
-                let bgStyle = 'bg-slate-50';
-                let indicatorText = null;
+                  let borderStyle = 'border-slate-100';
+                  let bgStyle = 'bg-slate-50';
+                  let indicatorText = null;
 
-                if (isCorrectOption) {
-                  borderStyle = 'border-emerald-500';
-                  bgStyle = 'bg-emerald-50 text-emerald-800';
-                  indicatorText = '✓ Correct Choice';
-                } else if (isUserWrongChoice) {
-                  borderStyle = 'border-rose-400';
-                  bgStyle = 'bg-rose-50 text-rose-800';
-                  indicatorText = '✗ Your Choice';
-                }
+                  if (isCorrectOption) {
+                    borderStyle = 'border-emerald-500';
+                    bgStyle = 'bg-emerald-50 text-emerald-800';
+                    indicatorText = '✓ Correct Choice';
+                  } else if (isUserWrongChoice) {
+                    borderStyle = 'border-rose-400';
+                    bgStyle = 'bg-rose-50 text-rose-800';
+                    indicatorText = '✗ Your Choice';
+                  }
+
+                  return (
+                    <div key={oIdx} className={`p-3 rounded-xl border text-xs leading-normal transition-all ${borderStyle} ${bgStyle}`}>
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium pr-2">{option}</span>
+                        {indicatorText && (
+                          <span className="text-[8px] font-mono font-bold uppercase tracking-wider shrink-0 px-1.5 py-0.5 rounded bg-white/60">
+                            {indicatorText}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* BDFCPS-style Smart Note Rationale Card */}
+              {(() => {
+                const note = BDFCPS_SMART_NOTES_MAP[currentQuestion.id];
+                const criteria = note ? note.criteria : [
+                  currentQuestion.explanation.split('.')[0] + '.',
+                  `Confirm and cross-reference diagnostic parameters for "${currentQuestion.topic}".`,
+                  'Verify absence of atypical mimic conditions prior to instituting therapy.'
+                ];
+                const steps = note ? note.steps : [
+                  'Establish patent IV access; monitor vital timelines and record serial ECG or serum levels.',
+                  'Utilize directed pharmaceutical or procedural protocols as outlined under clinical guidelines.',
+                  'Discharge with scheduled outpatient clinician follow-up index.'
+                ];
+                const citation = note ? note.citation : (currentQuestion.reference || 'Bailey & Love\'s 28th Ed, Page 412');
 
                 return (
-                  <div key={oIdx} className={`p-3 rounded-xl border text-xs leading-normal transition-all ${borderStyle} ${bgStyle}`}>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium pr-2">{option}</span>
-                      {indicatorText && (
-                        <span className="text-[8px] font-mono font-bold uppercase tracking-wider shrink-0 px-1.5 py-0.5 rounded bg-white/60">
-                          {indicatorText}
-                        </span>
-                      )}
+                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-3.5 text-xs text-white shadow" id="bdfcps-smart-note-card">
+                    {/* Glowing header badge */}
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                      <span className="text-[9px] uppercase tracking-widest font-mono font-black text-teal-400 flex items-center gap-1.5 animate-pulse">
+                        <Sparkles className="w-3.5 h-3.5 text-yellow-400 fill-yellow-450" />
+                        BDFCPS Clinical Smart Note
+                      </span>
+                      <span className="text-[8px] font-mono text-slate-500 uppercase">Interactive Rationale</span>
+                    </div>
+
+                    {/* Core explanation overview */}
+                    <div className="space-y-1">
+                      <span className="text-[8px] uppercase font-bold text-slate-400 block tracking-wider">Clinical Insight</span>
+                      <p className="text-slate-350 leading-relaxed text-[10.5px]">
+                        {currentQuestion.explanation}
+                      </p>
+                    </div>
+
+                    {/* Diagnostic Criteria Block */}
+                    <div className="space-y-1.5">
+                      <span className="text-[8px] uppercase font-bold text-teal-400 block tracking-wider font-mono">1. Clinical Diagnostic Criteria</span>
+                      <ul className="space-y-1 font-sans text-slate-300 text-[10px] pl-0.5">
+                        {criteria.map((bullet, bIdx) => (
+                          <li key={bIdx} className="flex items-start gap-1.5 leading-snug">
+                            <Check className="w-3 h-3 text-teal-500 shrink-0 mt-0.5" />
+                            <span>{bullet}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Immediate Action Steps Block */}
+                    <div className="space-y-1.5">
+                      <span className="text-[8px] uppercase font-bold text-rose-400 block tracking-wider font-mono">2. Immediate Clinical Actions Protocol</span>
+                      <ol className="space-y-1 font-sans text-slate-300 text-[10px] pl-0.5">
+                        {steps.map((step, sIdx) => (
+                          <li key={sIdx} className="flex items-start gap-2 leading-snug">
+                            <span className="w-3.5 h-3.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 text-[8px] font-mono font-bold mt-0.5">
+                              {sIdx + 1}
+                            </span>
+                            <span>{step}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+
+                    {/* Highlighting Textbook Citation line */}
+                    <div className="pt-2 border-t border-slate-800/80 text-[9px] font-mono font-semibold text-slate-400 flex items-center justify-between">
+                      <span className="flex items-center gap-1"><Book className="w-3 h-3 text-slate-500" /> Textbook Citation:</span>
+                      <span className="text-teal-400 font-extrabold">{citation}</span>
                     </div>
                   </div>
                 );
-              })}
+              })()}
             </div>
-
-            {/* Shikho-style Smart Note Rationale Card */}
-            {(() => {
-              const note = SHIKHO_SMART_NOTES_MAP[currentQuestion.id];
-              const criteria = note ? note.criteria : [
-                currentQuestion.explanation.split('.')[0] + '.',
-                `Confirm and cross-reference diagnostic parameters for "${currentQuestion.topic}".`,
-                'Verify absence of atypical mimic conditions prior to instituting therapy.'
-              ];
-              const steps = note ? note.steps : [
-                'Establish patent IV access; monitor vital timelines and record serial ECG or serum levels.',
-                'Utilize directed pharmaceutical or procedural protocols as outlined under clinical guidelines.',
-                'Discharge with scheduled outpatient clinician follow-up index.'
-              ];
-              const citation = note ? note.citation : (currentQuestion.reference || 'Bailey & Love\'s 28th Ed, Page 412');
-
-              return (
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-3.5 text-xs text-white shadow" id="shikho-smart-note-card">
-                  {/* Glowing header badge */}
-                  <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
-                    <span className="text-[9px] uppercase tracking-widest font-mono font-black text-teal-400 flex items-center gap-1.5 animate-pulse">
-                      <Sparkles className="w-3.5 h-3.5 text-yellow-400 fill-yellow-450" />
-                      Shikho Clinical Smart Note
-                    </span>
-                    <span className="text-[8px] font-mono text-slate-500 uppercase">Interactive Rationale</span>
-                  </div>
-
-                  {/* Core explanation overview */}
-                  <div className="space-y-1">
-                    <span className="text-[8px] uppercase font-bold text-slate-400 block tracking-wider">Clinical Insight</span>
-                    <p className="text-slate-350 leading-relaxed text-[10.5px]">
-                      {currentQuestion.explanation}
-                    </p>
-                  </div>
-
-                  {/* Diagnostic Criteria Block */}
-                  <div className="space-y-1.5">
-                    <span className="text-[8px] uppercase font-bold text-teal-400 block tracking-wider font-mono">1. Clinical Diagnostic Criteria</span>
-                    <ul className="space-y-1 font-sans text-slate-300 text-[10px] pl-0.5">
-                      {criteria.map((bullet, bIdx) => (
-                        <li key={bIdx} className="flex items-start gap-1.5 leading-snug">
-                          <Check className="w-3 h-3 text-teal-500 shrink-0 mt-0.5" />
-                          <span>{bullet}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  {/* Immediate Action Steps Block */}
-                  <div className="space-y-1.5">
-                    <span className="text-[8px] uppercase font-bold text-rose-400 block tracking-wider font-mono">2. Immediate Clinical Actions Protocol</span>
-                    <ol className="space-y-1 font-sans text-slate-300 text-[10px] pl-0.5">
-                      {steps.map((step, sIdx) => (
-                        <li key={sIdx} className="flex items-start gap-2 leading-snug">
-                          <span className="w-3.5 h-3.5 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 text-[8px] font-mono font-bold mt-0.5">
-                            {sIdx + 1}
-                          </span>
-                          <span>{step}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-
-                  {/* Highlighting Textbook Citation line */}
-                  <div className="pt-2 border-t border-slate-800/80 text-[9px] font-mono font-semibold text-slate-400 flex items-center justify-between">
-                    <span className="flex items-center gap-1"><Book className="w-3 h-3 text-slate-500" /> Textbook Citation:</span>
-                    <span className="text-teal-400 font-extrabold">{citation}</span>
-                  </div>
-                </div>
-              );
-            })()}
           </div>
 
-          {/* Review Navigator */}
-          <div className="flex items-center justify-between gap-2 pt-2">
+          {/* Fixed bottom actions panel for Review Mode (aligned above tab bar) */}
+          <div className="absolute bottom-16 left-0 right-0 bg-white border-t border-slate-150 p-3 flex flex-col gap-2 z-10 shadow-[0_-4px_12px_rgba(15,23,42,0.08)]">
+            {/* Review Navigator */}
+            <div className="flex items-center justify-between gap-2">
+              <button 
+                disabled={currentQuestionIdx === 0}
+                onClick={() => setCurrentQuestionIdx(prev => prev - 1)}
+                className="flex-1 bg-white border border-slate-200 text-slate-700 font-bold py-2.5 rounded-xl disabled:opacity-40 text-xs transition active:scale-95"
+              >
+                Previous Exam Item
+              </button>
+              <button 
+                disabled={currentQuestionIdx === totalQuestions - 1}
+                onClick={() => setCurrentQuestionIdx(prev => prev + 1)}
+                className="flex-1 bg-slate-900 text-teal-400 font-bold py-2.5 rounded-xl disabled:opacity-40 text-xs transition active:scale-95"
+              >
+                Next Exam Item
+              </button>
+            </div>
             <button 
-              disabled={currentQuestionIdx === 0}
-              onClick={() => setCurrentQuestionIdx(prev => prev - 1)}
-              className="flex-1 bg-white border border-slate-200 text-slate-700 font-bold py-2.5 rounded-xl disabled:opacity-40 text-xs transition-opacity"
+              onClick={() => setActiveExam(null)}
+              className="w-full bg-teal-600 text-white font-bold py-2.5 rounded-xl text-xs shadow hover:bg-teal-700 transition active:scale-[0.98]"
             >
-              Previous Exam Item
-            </button>
-            <button 
-              disabled={currentQuestionIdx === totalQuestions - 1}
-              onClick={() => setCurrentQuestionIdx(prev => prev + 1)}
-              className="flex-1 bg-slate-900 text-teal-400 font-bold py-2.5 rounded-xl disabled:opacity-40 text-xs transition-opacity"
-            >
-              Next Exam Item
+              Finish Review Desk
             </button>
           </div>
-          <button 
-            onClick={() => setActiveExam(null)}
-            className="w-full bg-teal-600 text-white font-bold py-2.5 rounded-xl text-xs shadow hover:bg-teal-700 transition"
-          >
-            Finish Review Desk
-          </button>
         </div>
       );
     }

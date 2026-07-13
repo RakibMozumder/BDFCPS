@@ -25,10 +25,10 @@ export function useCountdownTimer({
   }, [initialSeconds]);
 
   useEffect(() => {
-    if (!isActive || timeLeft <= 0) {
-      if (timeLeft <= 0 && isActive) {
-        onTimeUpRef.current();
-      }
+    if (!isActive) return;
+
+    if (timeLeft <= 0) {
+      onTimeUpRef.current();
       return;
     }
 
@@ -36,10 +36,10 @@ export function useCountdownTimer({
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(intervalId);
-          // Let the state hit 0 for display, then trigger onTimeUp slightly later
+          // Trigger onTimeUp but do it safely
           setTimeout(() => {
             onTimeUpRef.current();
-          }, 50);
+          }, 0);
           return 0;
         }
         return prev - 1;
@@ -49,7 +49,7 @@ export function useCountdownTimer({
     return () => {
       clearInterval(intervalId);
     };
-  }, [isActive, timeLeft]);
+  }, [isActive]);
 
   return {
     timeLeft,

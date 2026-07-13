@@ -49,7 +49,7 @@ export default function ProfileTab({
   mobile = '01517016312'
 }: ProfileTabProps) {
   // Navigation states: 'Menu' represents the dashboard options. 'Edit' represents personal/academic tabs.
-  const [currentScreen, setCurrentScreen] = useState<'Menu' | 'Edit' | 'AvatarSelect'>('Menu');
+  const [currentScreen, setCurrentScreen] = useState<'Menu' | 'Edit' | 'AvatarSelect' | 'ExamHistory'>('Menu');
   
   // Tabs within the edit screen: 'personal' | 'academic' | 'linking'
   const [activeSubTab, setActiveSubTab] = useState<'personal' | 'academic' | 'linking'>('personal');
@@ -79,17 +79,62 @@ export default function ProfileTab({
   const [showSaveToast, setShowSaveToast] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string>('');
 
+  // Upgrade & Subscription Interactive states
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('yearly');
+  const [loadingUpgrade, setLoadingUpgrade] = useState<boolean>(false);
+  const [upgradeSuccess, setUpgradeSuccess] = useState<boolean>(false);
+  const [cardNumber, setCardNumber] = useState<string>('');
+  const [cardName, setCardName] = useState<string>(doctor.name || '');
+  const [cardExpiry, setCardExpiry] = useState<string>('');
+  const [cardCvv, setCardCvv] = useState<string>('');
+  const [mfsNumber, setMfsNumber] = useState<string>(mobile);
+  const [mfsPin, setMfsPin] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'mfs'>('card');
+  const [autoRenew, setAutoRenew] = useState<boolean>(true);
+  const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+
+  // Exam History retrieval states
+  interface DBExamResult {
+    id?: string;
+    candidateName: string;
+    mobile: string;
+    bmdcNumber: string;
+    score: number;
+    correctCount: number;
+    totalQuestions: number;
+    timestamp: string;
+  }
+  const [examHistory, setExamHistory] = useState<DBExamResult[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState<boolean>(false);
+
+  const loadExamHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const res = await fetch(`/api/user/${mobile}/results`);
+      const data = await res.json();
+      if (data.success && data.results) {
+        setExamHistory(data.results);
+      }
+    } catch (err) {
+      console.warn("Failed fetching exam history on ProfileTab:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  React.useEffect(() => {
+    loadExamHistory();
+  }, [mobile]);
+
   // Custom photo upload reference hooks
   const cameraInputRef = React.useRef<HTMLInputElement>(null);
   const galleryInputRef = React.useRef<HTMLInputElement>(null);
 
+  const DEFAULT_AVATAR = "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100%25' height='100%25' fill='%23e1e1e1'/%3E%3Ccircle cx='50' cy='41' r='19' fill='%23a3a3a3'/%3E%3Cpath d='M 11 91 C 11 64,%2089 64,%2089%2091 Z' fill='%23a3a3a3'/%3E%3C/svg%3E";
+
   // Predefined avatar selections
   const avatarsList = [
-    'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=200', // Female Doctor
-    'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=200', // Male Doctor
-    'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&q=80&w=200', // Young Doctor
-    'https://images.unsplash.com/photo-1594824813573-246434de83fb?auto=format&fit=crop&q=80&w=200', // Pediatrician
-    'https://images.unsplash.com/photo-1622902046580-2b47f47f0471?auto=format&fit=crop&q=80&w=200', // Surgeon
+    DEFAULT_AVATAR
   ];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -276,53 +321,7 @@ export default function ProfileTab({
             </button>
           </div>
 
-          {/* Social Accounts Quick-linking Wrapper (From Screenshot 2) */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-xs space-y-2.5">
-            <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Link Accounts</span>
-            <div className="flex gap-2.5">
-              {/* Facebook Link */}
-              <button 
-                onClick={() => setLinkedFB(!linkedFB)}
-                className={`flex-1 py-1.5 px-3 border rounded-xl flex items-center justify-center gap-1.5 text-[11px] font-bold transition active:scale-95 ${
-                  linkedFB 
-                    ? 'bg-blue-50 border-blue-200 text-blue-600' 
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Facebook className="w-3.5 h-3.5 fill-blue-600 border-none" />
-                <span>Facebook</span>
-                {linkedFB ? <span className="text-[9px] text-emerald-500">✓</span> : <Plus className="w-3 h-3 text-slate-400" />}
-              </button>
 
-              {/* Google Link */}
-              <button 
-                onClick={() => setLinkedGoogle(!linkedGoogle)}
-                className={`flex-1 py-1.5 px-3 border rounded-xl flex items-center justify-center gap-1.5 text-[11px] font-bold transition active:scale-95 ${
-                  linkedGoogle 
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-600' 
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Chrome className="w-3.5 h-3.5" />
-                <span>Google</span>
-                {linkedGoogle ? <span className="text-[9px] text-emerald-500">✓</span> : <Plus className="w-3 h-3 text-slate-400" />}
-              </button>
-
-              {/* Apple Link */}
-              <button 
-                onClick={() => setLinkedApple(!linkedApple)}
-                className={`flex-1 py-1.5 px-3 border rounded-xl flex items-center justify-center gap-1.5 text-[11px] font-bold transition active:scale-95 ${
-                  linkedApple 
-                    ? 'bg-slate-900 border-slate-800 text-white' 
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <Apple className="w-3.5 h-3.5 fill-current" />
-                <span>Apple</span>
-                {linkedApple ? <span className="text-[9px] text-teal-400">✓</span> : <Plus className="w-3 h-3 text-slate-400" />}
-              </button>
-            </div>
-          </div>
 
           {/* List Options Menu (From Screenshot 2) */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-xs divide-y divide-slate-100 overflow-hidden">
@@ -364,30 +363,35 @@ export default function ProfileTab({
             {/* option 3: Upgrade Premium */}
             <button 
               onClick={() => {
-                setToastMsg("Premium features are unlocked in developer sandbox mode!");
-                setShowSaveToast(true);
-                setTimeout(() => setShowSaveToast(false), 1500);
+                setCurrentScreen('Upgrade');
               }}
               className="w-full px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-left transition"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
+                <div className="p-2 rounded-xl bg-amber-50 text-amber-600 animate-pulse">
                   <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-bold text-slate-800">Upgrade (Premium License)</h4>
-                  <p className="text-[9px] text-slate-400">Unlimited mock tests and tracking revision</p>
+                  <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    Upgrade (Premium License)
+                    {doctor.isPremium && (
+                      <span className="bg-emerald-100 text-emerald-700 text-[8px] px-1.5 py-0.5 rounded-full font-extrabold font-mono shrink-0">
+                        ACTIVE
+                      </span>
+                    )}
+                  </h4>
+                  <p className="text-[9px] text-slate-400">
+                    {doctor.isPremium ? "Unlocked • Unlimited medical drills active" : "Unlimited mock tests and tracking revision"}
+                  </p>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-slate-400" />
             </button>
-
+ 
             {/* option 4: Subscription */}
             <button 
               onClick={() => {
-                setToastMsg("Your premium subscription is currently active");
-                setShowSaveToast(true);
-                setTimeout(() => setShowSaveToast(false), 1500);
+                setCurrentScreen('Subscription');
               }}
               className="w-full px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-left transition"
             >
@@ -397,7 +401,11 @@ export default function ProfileTab({
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-slate-800">Subscription</h4>
-                  <p className="text-[9px] text-slate-400">Valid until: October 24, 2026</p>
+                  <p className="text-[9px] text-slate-400">
+                    {doctor.isPremium 
+                      ? `Valid until: ${doctor.subscriptionExpiry || 'October 24, 2026'}` 
+                      : "Trial Level • Tap to activate license"}
+                  </p>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-slate-400" />
@@ -406,9 +414,8 @@ export default function ProfileTab({
             {/* option 5: History */}
             <button 
               onClick={() => {
-                setToastMsg("Mock test history has been refreshed");
-                setShowSaveToast(true);
-                setTimeout(() => setShowSaveToast(false), 1500);
+                loadExamHistory();
+                setCurrentScreen('ExamHistory');
               }}
               className="w-full px-4 py-3 hover:bg-slate-50 flex items-center justify-between text-left transition"
             >
@@ -674,47 +681,53 @@ export default function ProfileTab({
             {activeSubTab === 'linking' && (
               <div className="space-y-4">
                 
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Account Linking</span>
                   
                   {/* Phone display */}
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-700 block">Phone Number</label>
-                    <div className="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-600 font-mono font-semibold flex items-center justify-between">
-                      <span>{mobile}</span>
-                      <span className="text-teal-600 text-[10px] font-bold flex items-center gap-0.5">
-                        <CheckCircle className="w-3.5 h-3.5 fill-teal-100" /> Verified
+                    <label className="text-xs font-bold text-slate-700 block">Phone Number</label>
+                    <div className="w-full bg-[#f3f7f9] border border-slate-100 rounded-2xl px-5 py-3 relative flex items-center justify-between text-slate-700">
+                      <span className="text-sm font-semibold tracking-wide text-slate-700 font-mono">{mobile}</span>
+                      <span className="text-teal-650 text-xs font-extrabold flex items-center gap-1.5 shrink-0">
+                        <CheckCircle className="w-4 h-4 text-teal-600 fill-teal-100" /> Verified
                       </span>
                     </div>
                   </div>
 
                   {/* Social buttons linking */}
-                  <div className="flex gap-2 text-center">
+                  <div className="flex gap-2.5 text-center mt-4">
                     <button 
                       onClick={() => setLinkedFB(!linkedFB)}
-                      className={`flex-1 py-2 border rounded-xl flex items-center justify-center gap-1 text-[11px] font-black transition ${
-                        linkedFB ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-white border-slate-200 text-slate-500'
+                      className={`flex-1 py-3 border rounded-2xl flex items-center justify-center gap-1.5 text-xs font-black transition-all ${
+                        linkedFB 
+                          ? 'bg-blue-50/70 border-blue-200 text-blue-600 font-extrabold scale-[1.02]' 
+                          : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                       }`}
                     >
-                      <Facebook className="w-3.5 h-3.5 fill-current border-none" />
+                      <Facebook className="w-4 h-4 fill-current border-none" />
                       <span>FB +</span>
                     </button>
                     <button 
                       onClick={() => setLinkedGoogle(!linkedGoogle)}
-                      className={`flex-1 py-2 border rounded-xl flex items-center justify-center gap-1 text-[11px] font-black transition ${
-                        linkedGoogle ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-white border-slate-200 text-slate-500'
+                      className={`flex-1 py-3 border rounded-2xl flex items-center justify-center gap-1.5 text-xs font-black transition-all ${
+                        linkedGoogle 
+                          ? 'bg-[#ecfdf5] border-[#10b981] text-[#059669] font-extrabold scale-[1.02]' 
+                          : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                       }`}
                     >
-                      <Chrome className="w-3.5 h-3.5" />
+                      <Chrome className="w-4 h-4 text-current" />
                       <span>Google +</span>
                     </button>
                     <button 
                       onClick={() => setLinkedApple(!linkedApple)}
-                      className={`flex-1 py-2 border rounded-xl flex items-center justify-center gap-1 text-[11px] font-black transition ${
-                        linkedApple ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-500'
+                      className={`flex-1 py-3 border rounded-2xl flex items-center justify-center gap-1.5 text-xs font-black transition-all ${
+                        linkedApple 
+                          ? 'bg-slate-950 border-slate-800 text-white font-extrabold scale-[1.02]' 
+                          : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
                       }`}
                     >
-                      <Apple className="w-3.5 h-3.5 fill-current" />
+                      <Apple className="w-4 h-4 fill-current" />
                       <span>Apple +</span>
                     </button>
                   </div>
@@ -861,13 +874,13 @@ export default function ProfileTab({
               <div className="flex-grow border-t border-slate-200"></div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="flex justify-center py-2">
               {avatarsList.map((avatarUrl, idx) => (
                 <button 
                   key={idx}
                   onClick={() => handleAvatarSelect(avatarUrl)}
-                  className={`p-2 bg-white rounded-2xl border text-center transition hover:shadow-md active:scale-95 ${
-                    doctor.avatar === avatarUrl ? 'border-teal-500 bg-teal-50/20 shadow-sm' : 'border-slate-200'
+                  className={`p-4 bg-white rounded-2xl border text-center transition hover:scale-103 active:scale-95 max-w-[150px] ${
+                    doctor.avatar === avatarUrl ? 'border-teal-500 bg-teal-50/25 shadow-sm' : 'border-slate-200'
                   }`}
                 >
                   <img 
@@ -876,8 +889,8 @@ export default function ProfileTab({
                     className="w-16 h-16 rounded-full mx-auto object-cover border border-slate-100"
                     referrerPolicy="no-referrer"
                   />
-                  <span className="text-[10px] text-slate-500 font-bold block mt-2">
-                    {idx === 0 ? 'Pleasant Doctor' : idx === 1 ? 'Stylish Male' : idx === 2 ? 'Young Doctor' : idx === 3 ? 'Pediatric Doctor' : 'Surgeon Specialist'}
+                  <span className="text-[11px] text-slate-500 font-bold block mt-2">
+                    Default Avatar
                   </span>
                 </button>
               ))}
@@ -887,6 +900,626 @@ export default function ProfileTab({
               Once changes are made, the avatar will be saved directly to your profile.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Screen 4: EXAM HISTORY */}
+      {currentScreen === 'ExamHistory' && (
+        <div className="flex flex-col bg-slate-50 min-h-full">
+          {/* Back Header */}
+          <div className="bg-white border-b border-slate-200/65 sticky top-0 px-4 py-3.5 flex items-center justify-between z-10 shrink-0 shadow-3xs">
+            <button 
+              onClick={() => setCurrentScreen('Menu')}
+              className="p-1 px-2.5 border border-slate-205 hover:bg-slate-50 rounded-xl text-slate-700 flex items-center gap-1 transition text-xs font-bold"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-slate-600" />
+              <span>Back</span>
+            </button>
+            <h3 className="text-xs font-extrabold text-slate-850 tracking-tight">Exam History</h3>
+            <div className="w-[50px]"></div> {/* spacer spacer to center title */}
+          </div>
+
+          <div className="p-4 space-y-4">
+            <div className="bg-white rounded-2xl p-4 border border-slate-100 shadow-3xs col-span-2">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-2">History Overview</span>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-teal-50/40 rounded-xl p-3 border border-teal-100/30 text-center">
+                  <span className="text-[10px] text-slate-500 font-bold block mb-0.5">Exams Completed</span>
+                  <span className="text-lg font-black text-teal-700">{examHistory.length}</span>
+                </div>
+                <div className="bg-indigo-50/40 rounded-xl p-3 border border-indigo-100/30 text-center">
+                  <span className="text-[10px] text-slate-500 font-bold block mb-0.5">Avg Accuracy</span>
+                  <span className="text-lg font-black text-indigo-700">
+                    {examHistory.length > 0 
+                      ? `${Math.round(examHistory.reduce((sum, item) => sum + item.score, 0) / examHistory.length)}%` 
+                      : '0%'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Taken Exam Sessions</span>
+              
+              {loadingHistory ? (
+                <div className="py-12 text-center text-xs text-slate-400 font-bold">
+                  Loading performance records...
+                </div>
+              ) : examHistory.length === 0 ? (
+                <div className="bg-white rounded-2xl p-8 text-center border border-slate-100 space-y-2 shadow-3xs">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400">
+                    <History className="w-5 h-5 text-slate-550" />
+                  </div>
+                  <h4 className="text-xs font-bold text-slate-700">No Exam History Yet</h4>
+                  <p className="text-[10px] text-slate-400 leading-relaxed max-w-[200px] mx-auto font-medium">
+                    Take a live mock test or customize your clinical SBA drills to see detailed records here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {[...examHistory].reverse().map((result, index) => {
+                    const formattedDate = new Date(result.timestamp).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    });
+                    
+                    const isPassed = result.score >= 55; // standard exam pass criteria
+                    
+                    return (
+                      <div 
+                        key={result.id || index} 
+                        className="bg-white rounded-2xl p-4 border border-slate-100 shadow-3xs hover:shadow-2xs transition"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-1">
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-wider bg-rose-50 text-rose-600 border border-rose-100">
+                              MOCK TEST
+                            </span>
+                            <h4 className="text-[11px] font-black text-slate-800 leading-snug">
+                              FCPS Medicine SBA Paper
+                            </h4>
+                            <p className="text-[9px] text-slate-400 font-medium">{formattedDate}</p>
+                          </div>
+                          <div className="text-right shrink-0 space-y-1">
+                            <div className="text-sm font-black text-slate-800 font-mono tracking-xs">
+                              {result.score}%
+                            </div>
+                            <span className={`inline-block text-[8px] font-black px-1.5 py-0.5 rounded-md ${
+                              isPassed 
+                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                                : 'bg-red-50 text-red-600 border border-red-100'
+                            }`}>
+                              {result.correctCount}/{result.totalQuestions} MCQ • {isPassed ? 'PASSED' : 'RETRY'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Screen 5: UPGRADE PREMIUM SYSTEM */}
+      {currentScreen === 'Upgrade' && (
+        <div className="flex flex-col bg-slate-50 min-h-full">
+          {/* Back Header */}
+          <div className="bg-white border-b border-slate-200/65 sticky top-0 px-4 py-3.5 flex items-center justify-between z-10 shrink-0 shadow-3xs">
+            <button 
+              onClick={() => {
+                setUpgradeSuccess(false);
+                setCurrentScreen('Menu');
+              }}
+              className="p-1 px-2.5 border border-slate-205 hover:bg-slate-50 rounded-xl text-slate-700 flex items-center gap-1 transition text-xs font-bold"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-slate-600" />
+              <span>Back</span>
+            </button>
+            <h3 className="text-xs font-extrabold text-slate-850 tracking-tight">Upgrade License</h3>
+            <div className="w-[50px]"></div>
+          </div>
+
+          <div className="p-4 space-y-4">
+            
+            {/* If successful */}
+            {upgradeSuccess ? (
+              <div className="bg-white rounded-3xl p-6 border border-teal-100 text-center space-y-4 shadow-sm animate-fade-in">
+                <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
+                  <ShieldCheck className="w-9 h-9 fill-emerald-100" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-base font-black text-slate-800">License Activated!</h3>
+                  <p className="text-xs text-slate-500 max-w-[280px] mx-auto leading-relaxed">
+                    Congratulations <strong>{doctor.name}</strong>! Your FCPS CBT Mock Exam & Intelligent driller pro key has been linked to your mobile successfully.
+                  </p>
+                </div>
+                <div className="bg-[#f0fdf4] rounded-2xl p-4 border border-emerald-100 max-w-[280px] mx-auto text-left space-y-2">
+                  <div className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> All premium privileges unlocked:
+                  </div>
+                  <ul className="text-[10px] text-slate-600 space-y-1 font-medium list-disc list-inside">
+                    <li>3,600+ Real CPSP format clinical SBAs</li>
+                    <li>Adaptive Weak-chapter diagnostics list</li>
+                    <li>Automated Google Sheets spreadsheet sync</li>
+                    <li>Verification Active Status indicator</li>
+                  </ul>
+                </div>
+                <button
+                  onClick={() => {
+                    setUpgradeSuccess(false);
+                    setCurrentScreen('Subscription');
+                  }}
+                  className="w-full bg-teal-650 hover:bg-teal-700 text-white py-3 rounded-2xl text-xs font-black transition shadow-sm active:scale-98"
+                >
+                  View Subscription Timeline
+                </button>
+              </div>
+            ) : doctor.isPremium ? (
+              /* Already Premium License State */
+              <div className="bg-white rounded-3xl p-6 border border-slate-100 text-center space-y-4 shadow-3xs">
+                <div className="w-14 h-14 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center mx-auto">
+                  <Star className="w-7 h-7 fill-amber-400" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-black text-slate-800">Premium active</h3>
+                  <p className="text-[11px] text-slate-400 leading-relaxed max-w-[230px] mx-auto">
+                    You have unlocked unlimited medical drill attempts. Subscription is valid until {doctor.subscriptionExpiry || 'October 24, 2026'}.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setCurrentScreen('Subscription')}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 rounded-xl text-xs font-bold transition"
+                >
+                  View Invoices & Billing Details
+                </button>
+              </div>
+            ) : (
+              /* Core Checkout Experience */
+              <div className="space-y-4">
+                
+                {/* Header Feature banner */}
+                <div className="bg-gradient-to-br from-teal-900 to-indigo-950 text-white rounded-3xl p-5 relative overflow-hidden shadow-2xs">
+                  <div className="absolute right-0 top-0 translate-x-4 -translate-y-4 w-28 h-28 rounded-full bg-teal-500 hover:bg-teal-400 opacity-20 filter blur-xl"></div>
+                  <div className="relative space-y-2.5">
+                    <span className="bg-amber-400 text-slate-900 text-[8px] font-black px-2 mt-0.5 py-0.5 rounded-full tracking-wider uppercase inline-block">
+                      SPECIALIST PREPARATION SUITE
+                    </span>
+                    <h4 className="text-sm font-black tracking-tight max-w-[220px]">
+                      Crack FCPS Part-I with the ultimate CBT Driller Key
+                    </h4>
+                    <p className="text-[10px] text-teal-200 leading-relaxed font-semibold max-w-[260px]">
+                      Join 1,200+ selected candidates. Get instant access to full clinical modules, detailed explanations and automatic tracking progress!
+                    </p>
+                  </div>
+                </div>
+
+                {/* Pricing Tab Selection */}
+                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Choose License Plan</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setSelectedPlan('monthly')}
+                    className={`p-3.5 bg-white rounded-2.5xl border text-left transition-all relative ${
+                      selectedPlan === 'monthly' ? 'border-teal-500 ring-1 ring-teal-500 bg-teal-50/5' : 'border-slate-250/70 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">6-MONTH ACCESS</span>
+                    <span className="text-sm font-black text-slate-800">৳1,500 <span className="text-[10px] font-semibold text-slate-500">BDT</span></span>
+                    <span className="text-[9.5px] font-bold text-slate-400 block mt-1.5">SBA Driller Basic</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedPlan('yearly')}
+                    className={`p-3.5 bg-white rounded-2.5xl border text-left transition-all relative overflow-hidden ${
+                      selectedPlan === 'yearly' ? 'border-teal-500 ring-1 ring-teal-500 bg-teal-50/5' : 'border-slate-250/70 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="absolute right-0 top-0 bg-amber-400 text-slate-950 text-[7px] font-black px-2 py-0.5 rounded-bl-lg tracking-wider uppercase">
+                      BEST VALUE
+                    </div>
+                    <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block mb-1">12-MONTH ACCESS</span>
+                    <span className="text-sm font-black text-slate-800">৳2,500 <span className="text-[10px] font-semibold text-slate-500">BDT</span></span>
+                    <span className="text-[9.5px] font-bold text-emerald-600 block mt-1.5 flex items-center gap-0.5">
+                      <Sparkles className="w-3 h-3 text-amber-500 fill-amber-500" /> CPSP Pass Guarantee
+                    </span>
+                  </button>
+                </div>
+
+                {/* Switchable Payment Methods */}
+                <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-3xs space-y-4">
+                  <div className="flex border-b border-slate-100 pb-3 justify-between items-center text-xs">
+                    <span className="font-extrabold text-slate-700">Payment Gateway</span>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setPaymentMethod('card')}
+                        className={`px-3 py-1 text-[10px] font-black rounded-lg transition-all ${
+                          paymentMethod === 'card' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-650'
+                        }`}
+                      >
+                        Credit Card
+                      </button>
+                      <button 
+                        onClick={() => setPaymentMethod('mfs')}
+                        className={`px-3 py-1 text-[10px] font-black rounded-lg transition-all ${
+                          paymentMethod === 'mfs' ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-650'
+                        }`}
+                      >
+                        bKash / Nagad
+                      </button>
+                    </div>
+                  </div>
+
+                  {paymentMethod === 'card' ? (
+                    /* Credit Card Mock Input */
+                    <div className="space-y-3.5">
+                      
+                      {/* Virtual interactive credit card layout */}
+                      <div className="bg-gradient-to-tr from-indigo-900 via-slate-800 to-slate-900 rounded-2xl p-4 text-white relative shadow-inner overflow-hidden font-mono text-[9px] h-[100px] flex flex-col justify-between">
+                        <div className="absolute right-0 bottom-0 translate-x-3 translate-y-3 w-16 h-16 rounded-full bg-white opacity-5"></div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[8px] font-bold font-sans text-teal-400 tracking-wider">CBT SECURE PLATFORM</span>
+                          <span className="font-bold text-[10px] italic">VISA</span>
+                        </div>
+                        <div className="text-[12px] font-bold tracking-widest text-center py-2">
+                          {cardNumber ? cardNumber.replace(/(\d{4})/g, '$1 ').trim() : '•••• •••• •••• ••••'}
+                        </div>
+                        <div className="flex justify-between gap-2 text-[7px] text-slate-350">
+                          <div>
+                            <span className="block text-[6px] text-slate-400 uppercase font-sans">Cardholder</span>
+                            <span className="font-bold whitespace-nowrap text-white">{cardName || 'Dr. Candidate'}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="block text-[6px] text-slate-400 uppercase font-sans">Expiry</span>
+                            <span className="font-bold text-white">{cardExpiry || 'MM/YY'}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="block text-[6px] text-slate-400 uppercase font-sans">CVV</span>
+                            <span className="font-bold text-white font-mono">{cardCvv ? '•••' : '000'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Explicit interactive form inputs */}
+                      <div className="space-y-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-600 block mb-1">Card Number</label>
+                          <input 
+                            type="text"
+                            maxLength={16}
+                            placeholder="4242 4242 4242 4242"
+                            value={cardNumber}
+                            onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, '').slice(0, 16))}
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-teal-500 font-mono"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-600 block mb-1">Expiration Date</label>
+                            <input 
+                              type="text"
+                              maxLength={5}
+                              placeholder="MM/YY"
+                              value={cardExpiry}
+                              onChange={(e) => setCardExpiry(e.target.value.slice(0, 5))}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-teal-500 font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-600 block mb-1">Security Code (CVV)</label>
+                            <input 
+                              type="password"
+                              maxLength={3}
+                              placeholder="•••"
+                              value={cardCvv}
+                              onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 3))}
+                              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-teal-500 font-mono"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+                  ) : (
+                    /* Mobile MFS Mock Inputs */
+                    <div className="space-y-3.5">
+                      <div className="p-3 bg-pink-50/40 rounded-xl border border-pink-100 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-pink-500 text-white font-black text-xs flex items-center justify-between justify-center uppercase select-none shrink-0 scale-95 shadow-sm">
+                          b
+                        </div>
+                        <div className="text-[10px] text-slate-650 leading-relaxed font-semibold">
+                          Complete payment securely with <strong>bKash or Nagad wallet</strong>. Your dynamic OTP verification screen triggers automatically.
+                        </div>
+                      </div>
+
+                      <div className="space-y-2.5">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-700 block mb-0.5">Mobile Wallet Number</label>
+                          <input 
+                            type="text"
+                            placeholder="e.g. 01712345678"
+                            value={mfsNumber}
+                            onChange={(e) => setMfsNumber(e.target.value)}
+                            className="w-full bg-slate-55 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-teal-500 font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-700 block mb-0.5">Wallet PIN (Virtual Encrypted)</label>
+                          <input 
+                            type="password"
+                            placeholder="••••"
+                            maxLength={4}
+                            value={mfsPin}
+                            onChange={(e) => setMfsPin(e.target.value.replace(/\D/g, ''))}
+                            className="w-full bg-slate-55 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-teal-500 tracking-widest font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Submit pay actions */}
+                  <div className="pt-2">
+                    <button
+                      onClick={() => {
+                        setLoadingUpgrade(true);
+                        setTimeout(() => {
+                          setLoadingUpgrade(false);
+                          setUpgradeSuccess(true);
+                          
+                          // Save the true premium upgrade to DoctorProfile state with proper timeline trigger
+                          onUpdateProfile({
+                            ...doctor,
+                            isPremium: true,
+                            subscriptionExpiry: selectedPlan === 'yearly' ? 'June 21, 2027' : 'December 21, 2026'
+                          });
+
+                          setToastMsg("Premium plan unlocked successfully!");
+                          setShowSaveToast(true);
+                          setTimeout(() => setShowSaveToast(false), 2000);
+                        }, 1800);
+                      }}
+                      disabled={loadingUpgrade}
+                      className="w-full bg-[#0a5c5a] hover:bg-teal-800 disabled:bg-slate-400 text-white font-black py-3 rounded-2xl text-xs tracking-wide transition shadow-sm flex items-center justify-center gap-2"
+                    >
+                      <Lock className="w-3.5 h-3.5 text-teal-200" />
+                      {loadingUpgrade ? "Processing Sandbox Gateway..." : `Pay ৳${selectedPlan === 'yearly' ? '2,500' : '1,500'} & Activate Premium`}
+                    </button>
+                    <p className="text-[9px] text-slate-400 text-center font-medium mt-2 leading-relaxed">
+                      SSL/TLS 256-bit Encrypted Transaction. Rest assured, you can safely trigger this mock checkout sandbox freely to simulate full pro privileges.
+                    </p>
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
+
+      {/* Screen 6: SUBSCRIPTION TIMELINE & BILLING */}
+      {currentScreen === 'Subscription' && (
+        <div className="flex flex-col bg-slate-50 min-h-full">
+          {/* Back Header */}
+          <div className="bg-white border-b border-slate-200/65 sticky top-0 px-4 py-3.5 flex items-center justify-between z-10 shrink-0 shadow-3xs">
+            <button 
+              onClick={() => setCurrentScreen('Menu')}
+              className="p-1 px-2.5 border border-slate-205 hover:bg-slate-50 rounded-xl text-slate-700 flex items-center gap-1 transition text-xs font-bold"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-slate-600" />
+              <span>Back</span>
+            </button>
+            <h3 className="text-xs font-extrabold text-slate-850 tracking-tight">My Subscription</h3>
+            <div className="w-[50px]"></div>
+          </div>
+
+          <div className="p-4 space-y-4">
+            
+            {/* Status card */}
+            <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-3xs space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider block mb-0.5">CURRENT TIMELINE</span>
+                  <h3 className="text-sm font-black text-slate-800">
+                    {doctor.isPremium ? "FCPS CBT Ultimate Pass" : "Regular Basic Plan"}
+                  </h3>
+                </div>
+                <span className={`px-2.5 py-0.5 rounded-full text-[8px] font-extrabold font-mono flex items-center gap-1 ${
+                  doctor.isPremium 
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                    : 'bg-amber-50 text-amber-600 border border-amber-100'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${doctor.isPremium ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`}></span>
+                  {doctor.isPremium ? 'PRO ACTIVE' : 'FREE BASIC'}
+                </span>
+              </div>
+
+              <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-100 divide-y divide-slate-105-to-transparent text-[11px] font-bold space-y-2.5">
+                <div className="flex justify-between pt-0 text-slate-600">
+                  <span>Billing Period:</span>
+                  <span className="text-slate-800 font-mono">
+                    {doctor.isPremium ? 'June 21, 2026 - Present' : 'Inactive'}
+                  </span>
+                </div>
+                <div className="flex justify-between pt-2 text-slate-600">
+                  <span>Valid Until Date:</span>
+                  <span className="text-slate-800 font-mono">
+                    {doctor.isPremium ? (doctor.subscriptionExpiry || 'October 24, 2026') : 'N/A'}
+                  </span>
+                </div>
+                {doctor.isPremium && (
+                  <div className="flex justify-between pt-2 text-slate-600 hover:opacity-90">
+                    <span>Auto-renew membership:</span>
+                    <button 
+                      onClick={() => {
+                        setAutoRenew(!autoRenew);
+                        setToastMsg(autoRenew ? "Auto-renew disabled successfully" : "Auto-renew enabled successfully");
+                        setShowSaveToast(true);
+                        setTimeout(() => setShowSaveToast(false), 1500);
+                      }}
+                      className={`w-8 h-4.5 rounded-full p-0.5 transition-all outline-none ${
+                        autoRenew ? 'bg-[#0a5c5a] flex justify-end' : 'bg-slate-300 flex justify-start'
+                      }`}
+                    >
+                      <span className="w-3.5 h-3.5 bg-white rounded-full block shadow-sm shrink-0"></span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* If not premium, quick CTA to upgrade */}
+              {!doctor.isPremium && (
+                <button
+                  onClick={() => setCurrentScreen('Upgrade')}
+                  className="w-full bg-[#0a5c5a] hover:bg-teal-800 text-white font-black py-2.5 rounded-2xl text-[11px] transition shadow-inner active:scale-98 flex items-center justify-center gap-1.5"
+                >
+                  <Star className="w-3.5 h-3.5 fill-amber-300 text-amber-300" /> Upgrade Candidate License Now
+                </button>
+              )}
+            </div>
+
+            {/* Simulated invoices receipts */}
+            <div className="space-y-2.5">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block">Invoices & Receipts History</span>
+              
+              {doctor.isPremium ? (
+                <div className="space-y-2.5">
+                  {[
+                    { id: 'INV-2026-0601', desc: 'FCPS CBT License Yearly Pass-Key', date: 'Jun 21, 2026', amt: '৳2,500', method: 'Visa Card **4242' },
+                    { id: 'INV-2026-0515', desc: 'Anatomy Paper-I SBA Booster Pack', date: 'May 15, 2026', amt: '৳450', method: 'bKash Wallet' }
+                  ].map((inv) => (
+                    <div 
+                      key={inv.id}
+                      onClick={() => setSelectedInvoice(inv)}
+                      className="bg-white rounded-2xl p-4 border border-slate-100 shadow-3xs flex items-center justify-between hover:border-slate-200 transition cursor-pointer"
+                    >
+                      <div className="space-y-1">
+                        <h4 className="text-[11px] font-black text-slate-800 leading-tight">{inv.desc}</h4>
+                        <div className="flex items-center gap-2 text-[9px] text-slate-400 font-semibold font-mono">
+                          <span>{inv.id}</span>
+                          <span>•</span>
+                          <span>{inv.date}</span>
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0 space-y-1">
+                        <div className="text-[11px] font-black font-mono text-slate-800">{inv.amt}</div>
+                        <span className="bg-emerald-50 text-emerald-600 border border-emerald-100 text-[8px] font-extrabold font-mono px-1.5 py-0.5 rounded">
+                          PAID
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl p-6 text-center border border-slate-100 text-slate-400 text-xs font-bold shadow-3xs">
+                  <FileText className="w-6 h-6 text-slate-300 mx-auto mb-1" />
+                  No invoice records available for Basic Plan
+                </div>
+              )}
+            </div>
+
+            {/* Cancel subscription simulator if Premium */}
+            {doctor.isPremium && (
+              <div className="pt-2 text-center">
+                <button
+                  onClick={() => {
+                    if (confirm("Are you sure you want to cancel your Premium License and fall back to Basic level? \nThis resets unlimited drills access.")) {
+                      onUpdateProfile({
+                        ...doctor,
+                        isPremium: false,
+                        subscriptionExpiry: undefined
+                      });
+                      setToastMsg("Premium plan canceled successfully");
+                      setShowSaveToast(true);
+                      setTimeout(() => setShowSaveToast(false), 1500);
+                      setCurrentScreen('Menu');
+                    }
+                  }}
+                  className="text-red-500 hover:text-red-700 text-[10px] font-bold tracking-tight border border-red-200/50 hover:bg-red-50/50 bg-white px-4 py-2 rounded-xl transition"
+                >
+                  Downgrade Account to Standard Basic
+                </button>
+              </div>
+            )}
+
+          </div>
+
+          {/* Detailed Invoice modal popup inside frame */}
+          {selectedInvoice && (
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-3xs flex items-center justify-center p-4 z-50 animate-fade-in">
+              <div className="bg-white rounded-3xl w-full max-w-[320px] p-5 border border-slate-200/60 shadow-xl space-y-4">
+                <div className="flex justify-between items-center border-b border-dashed border-slate-150 pb-3">
+                  <div>
+                    <h4 className="text-xs font-black text-slate-800">CBT Platform Invoice</h4>
+                    <span className="text-[9px] text-slate-400 font-mono">{selectedInvoice.id}</span>
+                  </div>
+                  <span className="bg-emerald-50 border border-emerald-100 text-emerald-600 text-[8px] font-extrabold px-2 py-0.5 rounded-full font-mono">
+                    COMPLETED
+                  </span>
+                </div>
+
+                <div className="space-y-3 text-[10.5px]">
+                  <div className="flex justify-between">
+                    <span className="text-slate-450 font-bold">Candidate:</span>
+                    <span className="text-slate-800 font-semibold">{doctor.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-450 font-bold">Hospital:</span>
+                    <span className="text-slate-800 font-semibold text-right max-w-[150px] truncate">{doctor.hospital}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-450 font-bold">Transaction Date:</span>
+                    <span className="text-slate-800 font-mono">{selectedInvoice.date}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-450 font-bold">Method:</span>
+                    <span className="text-slate-800 font-mono">{selectedInvoice.method}</span>
+                  </div>
+                  
+                  <div className="bg-slate-50/70 rounded-xl p-2.5 border border-slate-100 mt-2 space-y-1.5 text-[9.5px]">
+                    <div className="flex justify-between font-extrabold text-slate-650">
+                      <span>{selectedInvoice.desc}</span>
+                      <span className="font-mono">{selectedInvoice.amt}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-400 font-bold text-[8px]">
+                      <span>Intelligent MCQ Engine License Key Fee</span>
+                      <span>৳0.00</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center border-t border-dashed border-slate-150 pt-3 text-xs font-black text-slate-850">
+                    <span>Total Charged:</span>
+                    <span className="font-mono text-teal-700">{selectedInvoice.amt} BDT</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 text-center pt-2">
+                  <button
+                    onClick={() => {
+                      setToastMsg("Simulating Invoice Receipt PDF Download...");
+                      setShowSaveToast(true);
+                      setTimeout(() => setShowSaveToast(false), 2000);
+                    }}
+                    className="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-[10px] font-extrabold transition"
+                  >
+                    Download Receipt
+                  </button>
+                  <button
+                    onClick={() => setSelectedInvoice(null)}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-650 py-2 rounded-xl text-[10px] font-extrabold transition"
+                  >
+                    Close View
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 

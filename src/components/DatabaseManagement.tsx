@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Database, RefreshCw, Key, FileSpreadsheet, CheckCircle2, 
   AlertCircle, Table, Trash2, ArrowUpRight, HelpCircle, 
-  Sparkles, Check, ChevronDown, ChevronUp, Copy, BookOpen, AlertTriangle, Search, Undo2, Info
+  Sparkles, Check, ChevronDown, ChevronUp, Copy, BookOpen, AlertTriangle, Search, Undo2, Info, Link, Globe
 } from 'lucide-react';
 import { Question, SubjectCategory } from '../types';
 
@@ -34,6 +34,22 @@ export function getGoogleSheetsCsvUrl(idOrUrl: string): string {
   return `https://docs.google.com/spreadsheets/d/${clean}/export?format=csv`;
 }
 
+export function getRowValue(row: Record<string, string>, keys: string[], defaultVal = ''): string {
+  for (const key of keys) {
+    if (row[key] !== undefined) {
+      return row[key].trim();
+    }
+    const cleanKey = key.replace(/[\s_-]/g, '').toLowerCase();
+    for (const rKey in row) {
+      const cleanRKey = rKey.replace(/[\s_-]/g, '').toLowerCase();
+      if (cleanKey === cleanRKey) {
+        return row[rKey].trim();
+      }
+    }
+  }
+  return defaultVal;
+}
+
 export default function DatabaseManagement({ questions, onUpdateQuestions }: DatabaseManagementProps) {
   // Load initial settings from localStorage
   const [spreadsheetId, setSpreadsheetId] = useState<string>(() => {
@@ -52,8 +68,13 @@ export default function DatabaseManagement({ questions, onUpdateQuestions }: Dat
   const [syncMethod, setSyncMethod] = useState<'api' | 'csv'>(() => {
     return (localStorage.getItem('fcps_sync_method') as 'api' | 'csv') || 'csv';
   });
+  const [webappUrl, setWebappUrl] = useState<string>(() => {
+    return localStorage.getItem('fcps_sheets_webapp_url') || 'https://script.google.com/macros/s/AKfycbwopV73sE-CSfv2ZQfuutO6_Nqs6KQNo9tRWAwJWBwbDqgTidfBXgWDpPrL7Q5bRWBW7Q/exec';
+  });
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isTestingWebapp, setIsTestingWebapp] = useState<boolean>(false);
+  const [webappTestResult, setWebappTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [parsedPool, setParsedPool] = useState<Question[]>([]);
@@ -66,14 +87,16 @@ export default function DatabaseManagement({ questions, onUpdateQuestions }: Dat
     localStorage.setItem('fcps_sheets_api_key', apiKey);
     localStorage.setItem('fcps_sheet_range', rangeName);
     localStorage.setItem('fcps_sync_method', syncMethod);
-  }, [spreadsheetId, apiKey, rangeName, syncMethod]);
+    localStorage.setItem('fcps_sheets_webapp_url', webappUrl);
+  }, [spreadsheetId, apiKey, rangeName, syncMethod, webappUrl]);
 
   // Fallback preset configuration for showcase
   const handleLoadDemoValues = () => {
-    setSpreadsheetId('1S_gZ448jpxmCH8m47V4Y18k4DsdbyOon3qK3Hn5Lz_16Y_mY-gOP-uR7uR66');
-    setRangeName('Sheet1!A1:K200');
+    setSpreadsheetId('1OvzxOaT5cGZWKjkdcQ25uOFYDs5glgc_xTwGZs-jCUM');
+    setRangeName('Sheet1!A1:K300');
     setSyncMethod('csv');
-    setSuccessMessage('Loaded responsive parameters! You can now pull public CSV directly.');
+    setWebappUrl('https://script.google.com/macros/s/AKfycbwopV73sE-CSfv2ZQfuutO6_Nqs6KQNo9tRWAwJWBwbDqgTidfBXgWDpPrL7Q5bRWBW7Q/exec');
+    setSuccessMessage('Loaded responsive parameters! Connected with your active spreadsheet and WebApp.');
   };
 
   // CSV Splitting helper
@@ -194,15 +217,26 @@ export default function DatabaseManagement({ questions, onUpdateQuestions }: Dat
             if (idx !== undefined && rowArr[idx] !== undefined) {
               return rowArr[idx].trim();
             }
+            // case space-insensitive search
+            const targetClean = key.replace(/[\s_-]/g, '').toLowerCase();
+            for (const hKey in colMap) {
+              const hKeyClean = hKey.replace(/[\s_-]/g, '').toLowerCase();
+              if (targetClean === hKeyClean) {
+                const innerIdx = colMap[hKey];
+                if (innerIdx !== undefined && rowArr[innerIdx] !== undefined) {
+                  return rowArr[innerIdx].trim();
+                }
+              }
+            }
           }
           return defaultVal;
         };
 
         incomingQuestions = rows.slice(1).map((row: string[], index: number) => {
-          const id = getVal(row, ['id', 'questionid'], `sheets-api-${index}-${Date.now()}`);
-          const typeStr = getVal(row, ['type'], 'SBA').toUpperCase();
+          const id = getVal(row, ['id', 'questionid', 'question id', 'qid'], `sheets-api-${index}-${Date.now()}`);
+          const typeStr = getVal(row, ['type', 'questiontype', 'question type'], 'SBA').toUpperCase();
           const type: 'SBA' | 'MTF' = typeStr.includes('MTF') ? 'MTF' : 'SBA';
-          const tagsRaw = getVal(row, ['tags', 'tag', 'subject'], '[Medicine & Allied]');
+          const tagsRaw = getVal(row, ['tags', 'tag', 'subject', 'category'], '[Medicine & Allied]');
           
           let subjectStr = tagsRaw;
           let topicStr = tagsRaw;
@@ -230,23 +264,24 @@ export default function DatabaseManagement({ questions, onUpdateQuestions }: Dat
           const cleanSub = subjectStr.toLowerCase();
           
           if (cleanSub.includes('anatomy')) subject = 'Anatomy';
-          else if (cleanSub.includes('physio') || cleanSub.includes('biochem')) subject = 'Physiology & Biochemistry';
+          else if (cleanSub.includes('physio') || cleanSub.includes('biochem') || cleanSub.includes('tubule') || cleanSub.includes('renal')) subject = 'Physiology & Biochemistry';
           else if (cleanSub.includes('patho') || cleanSub.includes('micro')) subject = 'Pathology & Microbiology';
-          else if (cleanSub.includes('surg') || cleanSub.includes(' bailey')) subject = 'Surgery & Allied';
-          else if (cleanSub.includes('gyn') || cleanSub.includes('obs')) subject = 'Gynecology & Obstetrics';
+          else if (cleanSub.includes('surg') || cleanSub.includes('bailey') || cleanSub.includes('oper')) subject = 'Surgery & Allied';
+          else if (cleanSub.includes('gyn') || cleanSub.includes('obs') || cleanSub.includes('gynecology') || cleanSub.includes('obstetrics') || cleanSub.includes('gynaec')) subject = 'Gynecology & Obstetrics';
           else if (cleanSub.includes('peds') || cleanSub.includes('pedi')) subject = 'Pediatrics';
+          else if (cleanSub.includes('med') || cleanSub.includes('internal')) subject = 'Medicine & Allied';
           else {
-            const matched = validSubjects.find(s => s.toLowerCase() === cleanSub);
+            const matched = validSubjects.find(s => s.toLowerCase() === cleanSub || cleanSub.includes(s.toLowerCase()));
             if (matched) subject = matched;
           }
 
-          const questionTextRaw = getVal(row, ['questiontext', 'question', 'question text'], 'No body text supplied.');
+          const questionTextRaw = getVal(row, ['questiontext', 'question', 'question text', 'question_text', 'scenario', 'clinical scenario'], 'No body text supplied.');
           
-          const optA = getVal(row, ['optiona', 'option a', 'a'], '');
-          const optB = getVal(row, ['optionb', 'option b', 'b'], '');
-          const optC = getVal(row, ['optionc', 'option c', 'c'], '');
-          const optD = getVal(row, ['optiond', 'option d', 'd'], '');
-          const optE = getVal(row, ['optione', 'option e', 'e'], '');
+          const optA = getVal(row, ['optiona', 'option a', 'option_a', 'a'], '');
+          const optB = getVal(row, ['optionb', 'option b', 'option_b', 'b'], '');
+          const optC = getVal(row, ['optionc', 'option c', 'option_c', 'c'], '');
+          const optD = getVal(row, ['optiond', 'option d', 'option_d', 'd'], '');
+          const optE = getVal(row, ['optione', 'option e', 'option_e', 'e'], '');
 
           const options: string[] = [];
           if (optA) options.push(optA);
@@ -259,7 +294,7 @@ export default function DatabaseManagement({ questions, onUpdateQuestions }: Dat
             options.push(`Prepopulated Option ${String.fromCharCode(65 + options.length)}`);
           }
 
-          const rawCorrect = getVal(row, ['correctanswer', 'correct', 'answer', 'correctanswerindex'], 'A');
+          const rawCorrect = getVal(row, ['correctanswer', 'correct', 'answer', 'correctanswerindex', 'correct answer', 'correct_answer'], 'A');
           let correctAnswerIndex = 0;
           let mtfAnswers: string[] | undefined = undefined;
 
@@ -285,11 +320,22 @@ export default function DatabaseManagement({ questions, onUpdateQuestions }: Dat
             else if (normCorrect === 'E' || normCorrect === '5') correctAnswerIndex = 4;
             else {
               const parsedNum = parseInt(rawCorrect, 10);
-              correctAnswerIndex = isNaN(parsedNum) ? 0 : Math.max(0, Math.min(4, parsedNum));
+              if (!isNaN(parsedNum)) {
+                if (parsedNum >= 1 && parsedNum <= 5) {
+                  correctAnswerIndex = parsedNum - 1;
+                } else if (parsedNum >= 0 && parsedNum <= 4) {
+                  correctAnswerIndex = parsedNum;
+                } else {
+                  correctAnswerIndex = 0;
+                }
+              } else {
+                const matchedIdx = options.findIndex(opt => opt && opt.trim().toUpperCase() === normCorrect);
+                correctAnswerIndex = matchedIdx !== -1 ? matchedIdx : 0;
+              }
             }
           }
 
-          const expAndRef = getVal(row, ['explanation', 'rationale', 'explanationtext'], '');
+          const expAndRef = getVal(row, ['explanation', 'rationale', 'explanationtext', 'explanation text', 'reference text'], '');
           let explanation = expAndRef;
           let reference = 'CPSP Syllabus Guideline';
           const refBracketMatch = expAndRef.match(/\[(.*?)\]/);
@@ -328,11 +374,11 @@ export default function DatabaseManagement({ questions, onUpdateQuestions }: Dat
         }
 
         incomingQuestions = rows.map((row, index) => {
-          const id = row['id'] || `sheets-csv-${index}-${Date.now()}`;
-          const typeStr = (row['type'] || 'SBA').toUpperCase();
+          const id = getRowValue(row, ['id', 'questionid', 'question id', 'qid'], `sheets-csv-${index}-${Date.now()}`);
+          const typeStr = getRowValue(row, ['type', 'questiontype', 'question type'], 'SBA').toUpperCase();
           const type: 'SBA' | 'MTF' = typeStr.includes('MTF') ? 'MTF' : 'SBA';
           
-          let tagsRaw = row['tags'] || row['subject'] || '[Medicine & Allied] General chapter';
+          let tagsRaw = getRowValue(row, ['tags', 'tag', 'subject', 'category'], '[Medicine & Allied] General chapter');
           let subjectStr = tagsRaw;
           let topicStr = tagsRaw;
           
@@ -359,23 +405,24 @@ export default function DatabaseManagement({ questions, onUpdateQuestions }: Dat
           const cleanSub = subjectStr.toLowerCase();
           
           if (cleanSub.includes('anatomy')) subject = 'Anatomy';
-          else if (cleanSub.includes('physio') || cleanSub.includes('biochem')) subject = 'Physiology & Biochemistry';
+          else if (cleanSub.includes('physio') || cleanSub.includes('biochem') || cleanSub.includes('tubule') || cleanSub.includes('renal')) subject = 'Physiology & Biochemistry';
           else if (cleanSub.includes('patho') || cleanSub.includes('micro')) subject = 'Pathology & Microbiology';
-          else if (cleanSub.includes('surg') || cleanSub.includes(' bailey')) subject = 'Surgery & Allied';
-          else if (cleanSub.includes('gyn') || cleanSub.includes('obs')) subject = 'Gynecology & Obstetrics';
+          else if (cleanSub.includes('surg') || cleanSub.includes('bailey') || cleanSub.includes('oper')) subject = 'Surgery & Allied';
+          else if (cleanSub.includes('gyn') || cleanSub.includes('obs') || cleanSub.includes('gynecology') || cleanSub.includes('obstetrics') || cleanSub.includes('gynaec')) subject = 'Gynecology & Obstetrics';
           else if (cleanSub.includes('peds') || cleanSub.includes('pedi')) subject = 'Pediatrics';
+          else if (cleanSub.includes('med') || cleanSub.includes('internal')) subject = 'Medicine & Allied';
           else {
-            const matched = validSubjects.find(s => s.toLowerCase() === cleanSub);
+            const matched = validSubjects.find(s => s.toLowerCase() === cleanSub || cleanSub.includes(s.toLowerCase()));
             if (matched) subject = matched;
           }
 
-          const questionTextRaw = row['questiontext'] || row['question'] || 'No body text supplied.';
+          const questionTextRaw = getRowValue(row, ['questiontext', 'question', 'question text', 'question_text', 'scenario', 'clinical scenario'], 'No body text supplied.');
           
-          const optA = row['optiona'] || row['a'] || '';
-          const optB = row['optionb'] || row['b'] || '';
-          const optC = row['optionc'] || row['c'] || '';
-          const optD = row['optiond'] || row['d'] || '';
-          const optE = row['optione'] || row['e'] || '';
+          const optA = getRowValue(row, ['optiona', 'option a', 'option_a', 'a'], '');
+          const optB = getRowValue(row, ['optionb', 'option b', 'option_b', 'b'], '');
+          const optC = getRowValue(row, ['optionc', 'option c', 'option_c', 'c'], '');
+          const optD = getRowValue(row, ['optiond', 'option d', 'option_d', 'd'], '');
+          const optE = getRowValue(row, ['optione', 'option e', 'option_e', 'e'], '');
 
           const options: string[] = [];
           if (optA) options.push(optA);
@@ -388,7 +435,7 @@ export default function DatabaseManagement({ questions, onUpdateQuestions }: Dat
             options.push(`Prepopulated Option ${String.fromCharCode(65 + options.length)}`);
           }
 
-          const rawCorrect = row['correctanswer'] || row['correct'] || row['correctanswerindex'] || 'A';
+          const rawCorrect = getRowValue(row, ['correctanswer', 'correct', 'answer', 'correctanswerindex', 'correct answer', 'correct_answer'], 'A');
           let correctAnswerIndex = 0;
           let mtfAnswers: string[] | undefined = undefined;
 
@@ -414,11 +461,22 @@ export default function DatabaseManagement({ questions, onUpdateQuestions }: Dat
             else if (normCorrect === 'E' || normCorrect === '5') correctAnswerIndex = 4;
             else {
               const parsedNum = parseInt(rawCorrect, 10);
-              correctAnswerIndex = isNaN(parsedNum) ? 0 : Math.max(0, Math.min(4, parsedNum));
+              if (!isNaN(parsedNum)) {
+                if (parsedNum >= 1 && parsedNum <= 5) {
+                  correctAnswerIndex = parsedNum - 1;
+                } else if (parsedNum >= 0 && parsedNum <= 4) {
+                  correctAnswerIndex = parsedNum;
+                } else {
+                  correctAnswerIndex = 0;
+                }
+              } else {
+                const matchedIdx = options.findIndex(opt => opt && opt.trim().toUpperCase() === normCorrect);
+                correctAnswerIndex = matchedIdx !== -1 ? matchedIdx : 0;
+              }
             }
           }
 
-          const expAndRef = row['explanation'] || row['explanations'] || '';
+          const expAndRef = getRowValue(row, ['explanation', 'rationale', 'explanationtext', 'explanation text', 'reference text'], '');
           let explanation = expAndRef;
           let reference = 'CPSP Syllabus Guideline';
           const refBracketMatch = expAndRef.match(/\[(.*?)\]/);
@@ -461,6 +519,56 @@ export default function DatabaseManagement({ questions, onUpdateQuestions }: Dat
     onUpdateQuestions(parsedPool);
     setSuccessMessage(`Active application questions successfully updated! Total bank size: ${parsedPool.length} Qs.`);
     setParsedPool([]);
+  };
+
+  const handleTestWebappConnection = async () => {
+    setIsTestingWebapp(true);
+    setWebappTestResult(null);
+    setError(null);
+    setSuccessMessage(null);
+
+    const cleanUrl = webappUrl.trim();
+    if (!cleanUrl) {
+      setError('Please provide a Google Apps Script WebApp URL.');
+      setIsTestingWebapp(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/proxy/webapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: cleanUrl,
+          payload: {
+            type: 'test_connection',
+            message: 'Hello from BDFCPS medical exam portal connection tester!',
+            clientTime: new Date().toISOString()
+          }
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setWebappTestResult({
+          success: true,
+          message: 'The BDFCPS backend proxy was verified! Your Apps Script WebApp responded successfully.'
+        });
+        setSuccessMessage('Successfully checked BDFCPS Apps Script WebApp connection!');
+      } else {
+        setWebappTestResult({
+          success: false,
+          message: data.error || 'Connection could not be established to Google servers.'
+        });
+      }
+    } catch (err: any) {
+      setWebappTestResult({
+        success: false,
+        message: err.message || 'System proxy failure experienced.'
+      });
+    } finally {
+      setIsTestingWebapp(false);
+    }
   };
 
   const filteredQuestions = parsedPool.filter(q => {
@@ -651,6 +759,63 @@ export default function DatabaseManagement({ questions, onUpdateQuestions }: Dat
           )}
         </div>
 
+      </div>
+
+      {/* Google Apps Script Integration Section */}
+      <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/50 space-y-4">
+        <div className="flex items-center gap-2">
+          <div className="bg-emerald-50 text-emerald-600 p-2 rounded-xl">
+            <Link className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div>
+            <h3 className="text-xs font-bold text-slate-800">BDFCPS Google Sheet WebApp</h3>
+            <p className="text-[10px] text-slate-500">Submits live registrations and mock scores directly to your Apps Script WebApp.</p>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+            <Globe className="w-3.5 h-3.5 text-slate-500" />
+            Apps Script WebApp Deployment URL (doPost)
+          </label>
+          <input 
+            type="text"
+            value={webappUrl}
+            onChange={(e) => setWebappUrl(e.target.value)}
+            placeholder="https://script.google.com/macros/s/.../exec"
+            className="w-full bg-white border border-slate-200 rounded-xl py-2 px-3 text-xs font-mono outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+            id="webapp-url-input"
+          />
+        </div>
+
+        <div className="flex items-center justify-between bg-white rounded-xl p-3 border border-slate-200/40 text-[11px]">
+          <span className="text-slate-650 flex items-center gap-1">
+            <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
+            <span>Automatic Sync Active</span>
+          </span>
+          <button
+            onClick={handleTestWebappConnection}
+            disabled={isTestingWebapp}
+            className="text-[10px] font-bold bg-slate-900 text-white rounded-lg px-3 py-1.5 hover:bg-slate-850 transition active:scale-95 disabled:opacity-55"
+            id="test-webapp-btn"
+          >
+            {isTestingWebapp ? 'Testing connection...' : 'Test WebApp Integration'}
+          </button>
+        </div>
+
+        {webappTestResult && (
+          <div className={`p-3 rounded-xl border flex gap-2 ${
+            webappTestResult.success 
+              ? 'bg-emerald-50/50 border-emerald-100 text-emerald-850' 
+              : 'bg-amber-50/50 border-amber-100 text-amber-850'
+          }`}>
+            <Info className="w-4 h-4 shrink-0 mt-0.5" />
+            <div className="space-y-0.5 text-[10px]">
+              <div className="font-bold">{webappTestResult.success ? 'Verification Passed!' : 'Connection Handled'}</div>
+              <p className="leading-normal">{webappTestResult.message}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Notifications status messages */}

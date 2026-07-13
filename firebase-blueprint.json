@@ -1,57 +1,106 @@
 {
   "entities": {
     "users": {
-      "fields": {
+      "title": "User Account Profile",
+      "description": "Candidate registration and study metrics.",
+      "type": "object",
+      "properties": {
         "mobile": {
           "type": "string",
-          "description": "Primary identifier for the user (mobile number)"
+          "description": "Primary user identification mobile number"
         },
         "name": {
           "type": "string",
-          "description": "Standard display name for the doctor account"
+          "description": "Candidate full name"
         },
         "email": {
           "type": "string",
-          "description": "Optional email address"
+          "description": "Candidate email address"
         },
         "bmdcNumber": {
           "type": "string",
-          "description": "BMDC Registration authority number"
+          "description": "Bangladesh Medical and Dental Council identifier"
         },
         "passwordHash": {
           "type": "string",
-          "description": "Simple authentication secret store"
+          "description": "Plaintext or base64 verification hash"
         },
         "profile": {
-          "type": "map",
-          "description": "Medical specialty target profile metadata parameters"
+          "type": "object",
+          "description": "Candidate specialty target parameters"
         },
         "progress": {
-          "type": "map",
-          "description": "Overall study progress stats, history items and category masteries"
+          "type": "object",
+          "description": "Overall study progress stats, streak counters and historical entries"
         },
         "mistakes": {
           "type": "array",
-          "description": "Saved customized mistakes/revision folder MCQs"
+          "description": "Saved mistakes MCQs"
         },
         "customExams": {
           "type": "array",
-          "description": "User created custom-made exams parameters and state"
+          "description": "User created custom tests parameters and state"
         },
         "createdAt": {
-          "type": "timestamp"
+          "type": "string"
+        }
+      }
+    },
+    "exam_results": {
+      "title": "Exam Results Entry",
+      "description": "Mock exam scorecards completed by candidate.",
+      "type": "object",
+      "properties": {
+        "candidateName": {
+          "type": "string"
+        },
+        "mobile": {
+          "type": "string"
+        },
+        "bmdcNumber": {
+          "type": "string"
+        },
+        "score": {
+          "type": "number"
+        },
+        "correctCount": {
+          "type": "number"
+        },
+        "totalQuestions": {
+          "type": "number"
+        },
+        "timestamp": {
+          "type": "string"
+        }
+      },
+      "required": ["mobile", "score", "timestamp"]
+    },
+    "cloud_questions": {
+      "title": "Cloud Question Pool Sync",
+      "description": "Automatically synced question list from Google spreadsheet.",
+      "type": "object",
+      "properties": {
+        "questions": {
+          "type": "array"
+        },
+        "lastSynced": {
+          "type": "string"
         }
       }
     }
   },
   "firestore": {
-    "rules": {
-      "users": {
-        "allow": {
-          "read": "request.auth != null",
-          "write": "request.auth != null"
-        }
-      }
+    "users/{userId}": {
+      "schema": "users",
+      "description": "Candidate private registered accounts containing study metrics."
+    },
+    "exam_results/{resultId}": {
+      "schema": "exam_results",
+      "description": "Live candidate exam summary data and scores."
+    },
+    "configs/{configId}": {
+      "schema": "cloud_questions",
+      "description": "Storage for daily automated questions sheets synchronization."
     }
   }
 }

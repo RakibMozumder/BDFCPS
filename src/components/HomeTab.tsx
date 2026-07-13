@@ -132,77 +132,7 @@ export default function HomeTab({
         />
       </div>
 
-      {/* Days Active Flame Streak & Compact Calendar Tracker (Requirement 3) */}
-      <div className="bg-slate-900 rounded-2xl p-4 text-white relative overflow-hidden shadow-md border border-slate-800" id="flame-streak-calendar-card">
-        <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/10 rounded-full blur-xl translate-x-4 -translate-y-4 animate-pulse" />
-        <div className="flex items-center justify-between gap-2.5 relative z-10">
-          <div className="space-y-1 flex-1">
-            <span className="text-[8px] text-teal-400 font-extrabold tracking-widest uppercase">Days Active Counter</span>
-            <div className="flex items-center gap-2">
-              <Flame className="w-8 h-8 text-orange-500 fill-orange-500 shrink-0 filter drop-shadow-[0_2px_8px_rgba(249,115,22,0.4)] animate-pulse" />
-              <div>
-                <h3 className="text-sm font-black text-white leading-none">{streakCount} Days Active</h3>
-                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-wider block mt-1.5">Elite Streak Tracker</span>
-              </div>
-            </div>
-          </div>
 
-          {/* Compact Monthly Calendar Grid view */}
-          <div className="bg-slate-950/65 border border-slate-850 rounded-xl p-2 shrink-0 w-[125px]" id="mini-calendar-month-grid">
-            <div className="flex justify-between items-center mb-1 text-[7px] text-slate-400 font-extrabold uppercase tracking-wide">
-              <span>June 2026</span>
-              <span className="text-teal-400 font-bold">✓ Active</span>
-            </div>
-            {/* Mini 30 day grid */}
-            <div className="grid grid-cols-6 gap-0.5">
-              {Array.from({ length: 30 }).map((_, i) => {
-                const isFilled = i < 18; // June 1 to 18 active
-                const isToday = i === 17; // Today (18th)
-                return (
-                  <div 
-                    key={i} 
-                    className={`h-3 bg-slate-900 rounded-sm flex items-center justify-center text-[5px] font-black leading-none ${
-                      isToday
-                        ? 'bg-orange-500 border border-orange-400 text-white animate-pulse'
-                        : isFilled 
-                          ? 'bg-gradient-to-br from-teal-500 to-teal-600 border border-teal-500 text-white' 
-                          : 'border border-slate-800 text-slate-600'
-                    }`}
-                  >
-                    {i + 1}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-        {/* Performance Progress Bar Card under Streak (Requirement 3) */}
-        <div className="mt-3.5 pt-3 border-t border-slate-800/60 space-y-2 relative z-10" id="performance-progress-metric">
-          <div className="flex justify-between text-[9px] items-center">
-            <span className="text-slate-400 font-semibold uppercase text-[7px] tracking-wider">Overall Accuracy Model</span>
-            <span className="text-teal-405 font-extrabold">{progress.averageScorePercentage}% Correct Choices</span>
-          </div>
-          
-          {/* High precision two-tone bar */}
-          <div className="w-full bg-rose-600 h-2 rounded-full overflow-hidden flex shadow-xs">
-            <div 
-              className="bg-teal-500 h-full transition-all duration-500"
-              style={{ width: `${progress.averageScorePercentage}%` }}
-            />
-          </div>
-
-          {/* Detailed Legend */}
-          <div className="flex justify-between text-[8px] font-mono text-slate-400">
-            <span className="inline-flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-teal-500" /> Correct ({progress.averageScorePercentage}%)
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Incorrect ({100 - progress.averageScorePercentage}%)
-            </span>
-          </div>
-        </div>
-      </div>
 
       {/* Feature Hub Dashboard Medical Grid (6 Option Cards - Requirement 1) */}
       <div className="space-y-2" id="dashboard-feature-channels">
@@ -489,46 +419,10 @@ export default function HomeTab({
         </p>
       </div>
 
-      {/* Shortcut Card to "Start Today\'s Live Exam" */}
-      <div 
-        onClick={onStartExam}
-        className="group relative bg-gradient-to-r from-teal-650 to-slate-800 rounded-2xl p-4 text-white overflow-hidden shadow-lg cursor-pointer hover:shadow-xl hover:translate-y-[-2px] transition-all duration-300 border border-teal-500/10"
-        id="start_live_exam_shortcut"
-      >
-        <div className="absolute top-0 right-0 w-32 h-32 bg-teal-500/10 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-500" />
-        
-        <div className="relative z-10 flex flex-col justify-between h-full space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="bg-white/20 backdrop-blur-sm text-[8px] font-mono font-bold tracking-widest text-teal-200 px-2 py-0.5 rounded uppercase">
-              Mock Assessment Live
-            </div>
-            <div className="flex items-center text-[9px] text-teal-300 font-mono gap-1 font-semibold">
-              <Clock className="w-3 h-3 text-teal-400" /> National Pool Active
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <h3 className="font-bold text-xs tracking-tight group-hover:text-teal-200 transition-colors inline-flex items-center gap-1">
-              Start Today's Live Exam <Sparkles className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
-            </h3>
-            <p className="text-[10px] text-slate-300 leading-snug">
-              "FCPS Part I - National Grand Mock". 100 SBA core questions compiled from verified 2021-2025 past papers.
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between pt-1.5 text-[9px] text-teal-300 font-semibold border-t border-white/10">
-            <span className="truncate max-w-[130px]">Syllabus: Pathology & Physiology</span>
-            <div className="flex items-center gap-1 bg-white/10 px-2 py-1 rounded-full text-[8px] text-white tracking-wider font-extrabold uppercase shrink-0">
-              Launch Test →
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Shikho-style Adaptive 'Weak Chapters' Remediation areas */}
+      {/* BDFCPS-style Adaptive 'Weak Chapters' Remediation areas */}
       <div 
         className="bg-white rounded-2xl p-4 border border-slate-100 shadow-sm space-y-3.5"
-        id="shikho-focus-remediation-dashboard"
+        id="bdfcps-focus-remediation-dashboard"
       >
         <div className="flex items-center justify-between pb-1 border-b border-slate-100">
           <div className="flex items-center gap-1.5">
@@ -537,7 +431,7 @@ export default function HomeTab({
             </div>
             <div>
               <h4 className="text-xs font-black text-slate-800">Your Focus Remediation Areas</h4>
-              <p className="text-[8.5px] text-slate-400 font-bold uppercase tracking-wider">Shikho Adaptive Remediation Engine</p>
+              <p className="text-[8.5px] text-slate-400 font-bold uppercase tracking-wider">BDFCPS Adaptive Remediation Engine</p>
             </div>
           </div>
           <span className="bg-rose-50 text-rose-700 text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0">

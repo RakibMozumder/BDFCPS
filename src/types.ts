@@ -21,6 +21,8 @@ export interface DoctorProfile {
   linkedFacebook?: boolean;
   linkedGoogle?: boolean;
   linkedApple?: boolean;
+  isPremium?: boolean;
+  subscriptionExpiry?: string;
 }
 
 export type SubjectCategory =
