@@ -1,0 +1,59 @@
+# GitHub Actions Workflow to compile APK and release it automatically
+name: Build and Release Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install Web Dependencies
+        run: npm ci
+
+      - name: Build Web Application
+        run: npm run build
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Capacitor CLI & Platform
+        run: |
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init "Bangladesh FCPS Companion" "com.rakibmuzumder.bdfcps" --web-dir=dist --confirm
+          npx cap add android
+
+      - name: Sync built web assets to Android
+        run: |
+          npx cap sync android
+
+      - name: Build Android APK Release
+        run: |
+          cd android
+          ./gradlew assembleRelease
+
+      - name: Rename and Move APK for Website download
+        run: |
+          mv android/app/build/outputs/apk/release/app-release-unsigned.apk ./BDFCPS_Companion_v2.0.apk
+
+      - name: Commit and Push compiled APK directly back to branch
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add BDFCPS_Companion_v2.0.apk
+          git commit -m "chore: compiled and updated latest production Android APK [skip ci]" || echo "No changes to commit"
+          git push
