@@ -26,7 +26,7 @@ import PhoneSimulator from './components/PhoneSimulator';
 import CodeExportPanel from './components/CodeExportPanel';
 import DatabaseManagement, { getGoogleSheetsCsvUrl, getRowValue } from './components/DatabaseManagement';
 import GitHubApkPortal from './components/GitHubApkPortal';
-const bdfcpsLogo = "/src/assets/images/bdfcps_logo_1782055989338.jpg";
+import bdfcpsLogo from './assets/images/bdfcps_logo_1782055989338.jpg';
 
 export const DEFAULT_AVATAR = "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100%25' height='100%25' fill='%23e1e1e1'/%3E%3Ccircle cx='50' cy='41' r='19' fill='%23a3a3a3'/%3E%3Cpath d='M 11 91 C 11 64,%2089 64,%2089%2091 Z' fill='%23a3a3a3'/%3E%3C/svg%3E";
 

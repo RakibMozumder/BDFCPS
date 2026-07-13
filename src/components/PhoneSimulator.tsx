@@ -18,7 +18,7 @@ import PracticeTab from './PracticeTab';
 import AnalyticsTab from './AnalyticsTab';
 import AuthScreen from './AuthScreen';
 import ProfileTab from './ProfileTab';
-const bdfcpsLogo = "/src/assets/images/bdfcps_logo_1782055989338.jpg";
+import bdfcpsLogo from '../assets/images/bdfcps_logo_1782055989338.jpg';
 
 interface WeakChapter {
   chapter: string;

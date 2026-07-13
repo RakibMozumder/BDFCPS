@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider } from 'firebase/auth';
-const bdfcpsLogo = "/src/assets/images/bdfcps_logo_1782055989338.jpg";
+import bdfcpsLogo from '../assets/images/bdfcps_logo_1782055989338.jpg';
 
 interface AuthScreenProps {
   onAuthSuccess: (userData: { name: string; email: string; bmdcNumber: string; mobile: string; state?: any; isNewRegistration?: boolean }) => void;
