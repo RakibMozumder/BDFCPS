@@ -25,6 +25,7 @@ import { QUESTIONS_BANK, LIVE_EXAMS_DATA } from './data/questions';
 import PhoneSimulator from './components/PhoneSimulator';
 import CodeExportPanel from './components/CodeExportPanel';
 import DatabaseManagement, { getGoogleSheetsCsvUrl, getRowValue } from './components/DatabaseManagement';
+import GitHubApkPortal from './components/GitHubApkPortal';
 const bdfcpsLogo = "/src/assets/images/bdfcps_logo_1782055989338.jpg";
 
 export const DEFAULT_AVATAR = "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100%25' height='100%25' fill='%23e1e1e1'/%3E%3Ccircle cx='50' cy='41' r='19' fill='%23a3a3a3'/%3E%3Cpath d='M 11 91 C 11 64,%2089 64,%2089%2091 Z' fill='%23a3a3a3'/%3E%3C/svg%3E";
@@ -148,7 +149,7 @@ export default function App() {
     }
   });
 
-  const [activeSegment, setActiveSegment] = useState<'simulation' | 'export' | 'database'>('simulation');
+  const [activeSegment, setActiveSegment] = useState<'simulation' | 'export' | 'database' | 'landing'>('landing');
   const [questions, setQuestions] = useState<Question[]>(() => {
     const cached = localStorage.getItem('fcps_cloud_questions');
     if (cached) {
@@ -1370,7 +1371,18 @@ export default function App() {
           <div className="lg:col-span-8 space-y-8">
             
             {/* View Segments tab controls */}
-            <div className="flex border-b border-slate-250">
+            <div className="flex flex-wrap border-b border-slate-250">
+              <button
+                onClick={() => setActiveSegment('landing')}
+                className={`py-3 px-6 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+                  activeSegment === 'landing' 
+                    ? 'border-[#ea2c59] text-[#ea2c59]' 
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                }`}
+                id="tab-btn-landing"
+              >
+                <Heart className="w-4 h-4 text-[#ea2c59] fill-[#ea2c59]/25" /> Website & APK Compiler
+              </button>
               <button
                 onClick={() => setActiveSegment('simulation')}
                 className={`py-3 px-6 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 ${
@@ -1405,7 +1417,9 @@ export default function App() {
             </div>
 
             {/* Segment Contents */}
-            {activeSegment === 'simulation' ? (
+            {activeSegment === 'landing' ? (
+              <GitHubApkPortal bdfcpsLogo={bdfcpsLogo} />
+            ) : activeSegment === 'simulation' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start bg-white p-6 rounded-3xl border border-slate-100 shadow-sm" id="simulator-grid-segment">
                 
                 {/* Simulated Device Frame column */}

@@ -1,4 +1,3 @@
-# GitHub Actions Workflow to compile APK and release it automatically
 name: Build and Release Android APK
 
 on:

@@ -1,0 +1,8 @@
+{
+  "appId": "com.rakibmuzumder.bdfcps",
+  "appName": "Bangladesh FCPS Companion",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
