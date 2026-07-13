@@ -59,3 +59,10 @@ jobs:
           git add BDFCPS_Companion_v2.0.apk
           git commit -m "chore: compiled and updated latest production Android APK [skip ci]" || echo "No changes to commit"
           git push
+
+      - name: Deploy Compiled Web App to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+
