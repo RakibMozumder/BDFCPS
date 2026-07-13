@@ -30,11 +30,11 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Install Capacitor CLI & Platform
+      - name: Initialize Capacitor Platform
         run: |
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init "Bangladesh FCPS Companion" "com.rakibmuzumder.bdfcps" --web-dir=dist --confirm
-          npx cap add android
+          if [ ! -d "android" ]; then
+            npx cap add android
+          fi
 
       - name: Sync built web assets to Android
         run: |
@@ -43,6 +43,7 @@ jobs:
       - name: Build Android APK Release
         run: |
           cd android
+          chmod +x gradlew
           ./gradlew assembleRelease
 
       - name: Rename and Move APK for Website download
